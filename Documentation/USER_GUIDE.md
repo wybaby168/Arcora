@@ -2,7 +2,7 @@
 
 ## 构建和启动
 
-运行要求：macOS 14+。构建需要可运行 Xcode 26+ 的 Mac、选定的 Xcode 命令行工具和 Python 3；Xcode 26 用于编译新版 macOS 原生图标。构建前运行一次 Xcode 并接受开发许可。使用已构建的应用不需要安装 Xcode。
+运行要求：macOS 14+。构建需要 macOS 26+、Xcode 26+、选定的 Xcode 命令行工具和 Python 3；构建机使用新版 CoreUI 工具验证原生图标。构建前运行一次 Xcode 并接受开发许可。使用已构建的应用不需要安装 Xcode。
 
 ```bash
 ./Scripts/bootstrap-engines.sh

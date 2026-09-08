@@ -39,7 +39,7 @@ Arcora 使用 SwiftUI / AppKit 提供压缩、浏览、解压和完整性校验�
 
 ## 构建与运行
 
-构建需要可运行 Xcode 26+ 的 Mac、已选择的对应命令行工具，以及 Python 3。Xcode 26 用于编译新版 macOS 原生图标资源；生成的应用仍支持 macOS 14+。首次准备依赖需要联网。
+构建需要 macOS 26+、Xcode 26+、已选择的对应命令行工具，以及 Python 3。构建机需要新版 CoreUI 工具来验证原生图标资源；生成的应用仍支持 macOS 14+。首次准备依赖需要联网。
 
 ```bash
 git clone https://github.com/wybaby168/Arcora.git

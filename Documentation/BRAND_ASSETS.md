@@ -35,7 +35,7 @@ and the English, Chinese, and Japanese READMEs.
   lookup: the packaged loose resource rendered blank through that path on
   macOS 26.6.2. A native archive symbol is used if the file cannot be decoded.
 
-Build and inspect the packaged icon on macOS:
+Build and inspect the packaged icon on macOS 26+ with Xcode 26+:
 
 ```sh
 bash Scripts/build-app.sh
@@ -50,6 +50,12 @@ and transparent outer padding of the legacy fallback.
 [check-icon-assets.py](../Scripts/check-icon-assets.py) also checks the shared
 artwork, native canvas layout, Info.plist wiring, compiled appearance stacks,
 and deployment target. Both the app build and macOS CI run these checks.
+
+The complete build/inspection pipeline requires macOS 26+ on the build host.
+macOS 15's system `assetutil` cannot materialize the newer icon-stack
+renditions even when Xcode 26 successfully compiles them. CI therefore uses
+macOS 26 with Xcode 26.4.1. This host-tool requirement does not change the
+app's macOS 14 deployment target or its legacy icon fallback.
 
 [verify-brand-icon.sh](../Scripts/verify-brand-icon.sh) compiles the production
 `BrandIcon` view with a resource-bundle provider pointing at the packaged app.

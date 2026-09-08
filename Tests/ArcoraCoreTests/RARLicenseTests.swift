@@ -98,7 +98,7 @@ final class RARLicenseTests:ArcoraTestCase {
         XCTAssertFalse(try FileManager.default.contentsOfDirectory(atPath:temp.path).contains{$0.hasPrefix(".arcora-")})
     }
     func testOfficialEngineRejectsNonLicenseTestData()throws {
-        guard let rar=EngineLocations.discover().rar else {
+        guard let rar=EngineLocations.discover(rarEngineDirectory:temp.appendingPathComponent("managed-rar")).rar else {
             if ProcessInfo.processInfo.environment["ARCORA_REQUIRE_RAR"]=="1" {throw ArchiveError.missingEngine("Official RAR required for license rejection test.")}
             throw XCTSkip("Official RAR unavailable")
         }

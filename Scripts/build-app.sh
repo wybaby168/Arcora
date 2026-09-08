@@ -4,6 +4,8 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 [ "$(uname -s)" = Darwin ] || { echo 'Building the app requires a Mac with Xcode 26+.' >&2; exit 1; }
+ICON_MACOS_MAJOR="$(sw_vers -productVersion | cut -d. -f1)"
+[[ "$ICON_MACOS_MAJOR" =~ ^[0-9]+$ ]] && [ "$ICON_MACOS_MAJOR" -ge 26 ] || { echo 'The full app build requires macOS 26+ to validate native icon stacks. The built app still runs on macOS 14+.' >&2; exit 1; }
 xcrun --find swift >/dev/null
 ICON_XCODE_MAJOR="$(xcodebuild -version | awk 'NR==1 { split($2, version, "."); print version[1] }')"
 [[ "$ICON_XCODE_MAJOR" =~ ^[0-9]+$ ]] && [ "$ICON_XCODE_MAJOR" -ge 26 ] || { echo 'Select Xcode 26+ to compile the native macOS icon. The app still runs on macOS 14+.' >&2; exit 1; }

@@ -10,8 +10,9 @@ For defects, provide the macOS version, architecture, app revision, engine versi
 
 ## Start on another Mac
 
-Use a Mac that supports Xcode 26 or later, select that Xcode's command-line
-tools, and have Python 3 available. The built app still targets macOS 14+.
+Use macOS 26 or later, select Xcode 26 or later's command-line tools, and have
+Python 3 available. The build host needs newer CoreUI tools for native icon
+inspection; the built app still targets macOS 14+.
 The initial dependency bootstrap needs internet access; no Homebrew packages,
 private signing identity, RAR engine or registration key are needed for the
 standard build and public baseline tests.
@@ -52,6 +53,10 @@ its loading code; check the installed sidebar and About page as well.
 Use a focused branch and add regression coverage. Run localization checks after every UI change and update all three languages together. Keep the three README files consistent when changing user-visible capabilities or requirements.
 
 RAR encoding tests are optional in public CI. Run them only with a lawfully obtained official engine; see [local RAR verification](Documentation/LOCAL_RAR.md). Report skipped tests honestly. Never weaken the standard app's registration gate to make tests pass.
+
+Optional codec tests select their engine through `ARCORA_RAR` and use
+test-owned managed-engine directories. They must not discover or modify an
+engine or registration imported into a contributor's normal Arcora profile.
 
 ## Remote handoff
 

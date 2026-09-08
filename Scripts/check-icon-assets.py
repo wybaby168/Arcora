@@ -7,6 +7,7 @@ on Tahoe. Requiring the compiled icon stack prevents that packaging regression.
 import argparse
 import json
 from pathlib import Path
+import platform
 import plistlib
 import struct
 import subprocess
@@ -48,6 +49,8 @@ def check_source():
 
 
 def check_app(app):
+    require(platform.system() == "Darwin" and int(platform.mac_ver()[0].split(".")[0] or 0) >= 26,
+            "native icon stack inspection requires macOS 26+ CoreUI; older assetutil cannot decode the stacks")
     resources = app / "Contents/Resources"
     info = plistlib.loads((app / "Contents/Info.plist").read_bytes())
     require(info.get("CFBundleIconName") == "Arcora", "app lacks CFBundleIconName=Arcora")

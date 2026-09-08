@@ -5,7 +5,9 @@ import XCTest
 /// Real official RAR -> 7-Zip interoperability. No mocked archive formats.
 final class RARIntegrationTests:ArcoraTestCase {
     private func service() throws -> ArchiveService {
-        let engines=EngineLocations.discover()
+        // Codec tests opt in through ARCORA_RAR, never through a developer's
+        // imported app engine or license state in Application Support.
+        let engines=EngineLocations.discover(rarEngineDirectory:temp.appendingPathComponent("managed-rar"))
         guard engines.rar != nil,engines.sevenZip != nil else {
             if ProcessInfo.processInfo.environment["ARCORA_REQUIRE_RAR"]=="1" {
                 throw ArchiveError.missingEngine("RAR tests require ARCORA_RAR and the pinned 7zz.")
@@ -142,7 +144,8 @@ final class RARDiscoveryAndVolumeTests:ArcoraTestCase {
         }
         _=try touch("Example.app/Contents/Info.plist","<?xml version=\"1.0\" encoding=\"UTF-8\"?><plist version=\"1.0\"><dict><key>CFBundleIdentifier</key><string>test.arcora</string></dict></plist>")
         let bundle=try XCTUnwrap(Bundle(url:app))
-        let engines=EngineLocations.discover(bundle:bundle,rar:URL(fileURLWithPath:"/missing/stale/rar"))
+        let engines=EngineLocations.discover(bundle:bundle,rar:URL(fileURLWithPath:"/missing/stale/rar"),
+            rarEngineDirectory:temp.appendingPathComponent("managed-rar"))
         XCTAssertTrue(engines.rarIsBundled)
         XCTAssertEqual(engines.rar?.lastPathComponent,"rar")
         XCTAssertTrue(engines.rar?.path.contains("Contents/Helpers/rar/")==true)

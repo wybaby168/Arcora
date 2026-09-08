@@ -4,7 +4,7 @@
 
 ## 构建与加载
 
-- [ ] Xcode 26+ 选定生产工具链完整编译 SwiftUI / AppKit / C 和原生图标资源；产物部署目标仍为 macOS 14。
+- [ ] 在 macOS 26+ 上使用选定的 Xcode 26+ 生产工具链，完整编译 SwiftUI / AppKit / C 并验证原生图标资源；产物部署目标仍为 macOS 14。
 - [ ] arm64 和 x86_64 Universal 三个自有程序及 7zz 架构验证通过。
 - [ ] Apple Silicon 原生启动，Intel 实机或等价可靠环境原生启动，不把 Rosetta 运行当成 Intel 原生验收。
 - [ ] 三语资源 Bundle、InfoPlist.strings、图标、许可和对应引擎源码都在 App 内。

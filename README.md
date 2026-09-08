@@ -39,7 +39,7 @@ See the [detailed support matrix](Documentation/FORMAT_SUPPORT.md) for additiona
 
 ## Build and run
 
-Build requirements: a Mac that supports Xcode 26 or later, that Xcode's command-line tools selected, and Python 3. Xcode 26 is needed for the native macOS icon resources; the built app still targets macOS 14 or later. Initial dependency preparation requires internet access.
+Build requirements: macOS 26 or later, Xcode 26 or later with its command-line tools selected, and Python 3. The build host needs the newer CoreUI tools to verify native icon stacks; the built app still targets macOS 14 or later. Initial dependency preparation requires internet access.
 
 ```bash
 git clone https://github.com/wybaby168/Arcora.git
