@@ -1,0 +1,43 @@
+name: Native macOS validation
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  macos:
+    runs-on: macos-14
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Toolchain
+        run: swift --version && xcodebuild -version
+      - name: Public source and documentation guard
+        run: |
+          python3 Scripts/check-public-tree.py --self-test
+          python3 Scripts/check-public-tree.py --staged
+      - name: Localization completeness
+        run: python3 Scripts/check-localization.py
+      - name: Pinned official engine and corresponding source
+        run: Scripts/bootstrap-engines.sh
+      - name: Native helper and application compilation
+        run: swift build
+      - name: Unit, native codec and official 7-Zip integration tests
+        env:
+          ARCORA_REQUIRE_7ZZ: '1'
+        run: swift test
+      - name: Universal app build and ad-hoc signature verification
+        run: Scripts/build-app.sh
+      - name: Verify the packaged app and distribution boundaries
+        run: |
+          python3 Scripts/assert-distribution-clean.py dist/Arcora.app
+          python3 Scripts/verify-release-gates.py
+          python3 Scripts/verify-app.py dist/Arcora.app
+      - name: Package test artifact
+        run: ditto -c -k --keepParent dist/Arcora.app dist/Arcora-CI-adhoc.zip
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Arcora-macOS-CI-not-notarized
+          path: dist/Arcora-CI-adhoc.zip
+          retention-days: 14

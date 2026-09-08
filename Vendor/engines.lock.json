@@ -1,0 +1,29 @@
+{
+  "7zip": {
+    "version": "26.03",
+    "mac": {"file": "7z2603-mac.tar.xz", "sha256": "5ca87677072c59f5602e5c49baa27d4694bacd2259b4e507f0094249d4281480"},
+    "linux-x64": {"file": "7z2603-linux-x64.tar.xz", "sha256": "dc99eff5008f1ab79bd7084c68513701547a808a89502bf4133683535ab3c695"},
+    "linux-arm64": {"file": "7z2603-linux-arm64.tar.xz", "sha256": "2389ba20e4d8295e8709c20b6263b69bd1ec4972fe38a04ad7a1badbf595b996"},
+    "source": {"file": "7z2603-src.tar.xz", "sha256": "9cbde5099c6deb73691b0579063da5827522ccbbcba3f0020fd04e8c8c16c0d4"},
+    "baseURL": "https://github.com/ip7z/7zip/releases/download/26.03/"
+  },
+  "libarchive": {
+    "version": "3.8.9",
+    "linkage": "static-on-macOS-system-on-Linux",
+    "file": "libarchive-3.8.9.tar.xz",
+    "sha256": "888c934f9d95648ecb9163dc8e23ab80a476ecb81a8f1154704a227b5b676dde",
+    "url": "https://github.com/libarchive/libarchive/releases/download/v3.8.9/libarchive-3.8.9.tar.xz"
+  },
+  "xz": {
+    "version": "5.8.3", "file": "xz-5.8.3.tar.gz",
+    "sha256": "3d3a1b973af218114f4f889bbaa2f4c037deaae0c8e815eec381c3d546b974a0",
+    "url": "https://github.com/tukaani-project/xz/releases/download/v5.8.3/xz-5.8.3.tar.gz"
+  },
+  "rar": {
+    "version": "7.23", "bundled": false,
+    "mode": "official-browser-download-local-original-import-customer-license",
+    "licenseURL": "https://www.rarlab.com/license.htm",
+    "arm64": {"file": "rarmacos-arm-723.tar.gz", "url": "https://www.rarlab.com/rar/rarmacos-arm-723.tar.gz", "sha256": "68b393c000758d477fde43c955ff7542f12f76f3f5e87cdda923152fc791bd4d", "binarySha256": "fd6c7db73c659a28b50408354f4a4845c53a67f929f37fd99df92aa77b9f5153"},
+    "x86_64": {"file": "rarmacos-x64-723.tar.gz", "url": "https://www.rarlab.com/rar/rarmacos-x64-723.tar.gz", "sha256": "da1fb3c3d7748136c9b369b683d574b372cb1ed049a634a81f85d93918346d8f", "binarySha256": "2512979417b2ba1c60f1a5783051931928099c3f407be8a12ef030c9cb54a8fb"}
+  }
+}

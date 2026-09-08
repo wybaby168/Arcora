@@ -1,0 +1,23 @@
+Arcora RAR local evaluation build / RAR 本机验证构建
+
+This locally assembled app is for private local use and integration testing,
+not customer distribution. It contains official RAR 7.23 engines, not a license.
+The RARLAB maximum 40-day evaluation period and usage terms apply:
+https://www.rarlab.com/license.htm
+Continued use requires your own valid license. Import your purchased rarreg.key
+in Settings > Engines. Rebuilding does not restart or extend evaluation.
+No redistribution permission or customer usage rights are granted by Arcora.
+The app is ad-hoc signed, not Developer ID signed or Apple-notarized.
+Do not publish, sell, or forward this app as a customer-ready installation package.
+
+本应用仅用于私有本地使用和集成验证，不是客户发行包。包含官方 RAR 7.23 引擎，
+不包含许可证。须遵守 RARLAB 最长 40 天试用期及使用条款；继续使用需要自己的
+有效许可证，可在“设置 > 引擎”导入。重新构建不会重置或延长评估期限。
+Arcora 未授予任何 RAR 分发或客户使用许可。
+本构建没有 Developer ID 签名或 Apple 公证，不可据此作为正式安装包对外发布。
+正式授权发行流程见源码中的 Documentation/RAR_DELIVERY.md。
+
+本アプリは個人のローカル利用と検証専用です。顧客向けに配布しないでください。
+公式 RAR 7.23 エンジンを含みますが、ライセンスは含みません。最大 40 日間の
+評価期間が適用され、その後は自身の有効なライセンスが必要です。
+設定 > エンジンから購入済みのキーをインポートしてください。
