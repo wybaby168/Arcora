@@ -59,8 +59,11 @@ final class RARPackageTests:ArcoraTestCase {
         }
     }
     func testWrongArchitectureRejectedBeforeWriting()throws {
+        // Resolve the optional fixture before the error assertion so XCTSkip
+        // propagates to XCTest when no proprietary package is present in CI.
+        let source=try original(.x86_64)
         let store=RARInstallationStore(root:root,package:.arm64)
-        XCTAssertThrowsError(try store.importPackage(from:original(.x86_64))) {
+        XCTAssertThrowsError(try store.importPackage(from:source)) {
             XCTAssertTrue($0.localizedDescription.contains("Wrong architecture"))
         }
         XCTAssertFalse(FileManager.default.fileExists(atPath:root.path))
