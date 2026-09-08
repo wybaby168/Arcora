@@ -238,3 +238,12 @@
 "rar.localBundleNote" = "仅供本机使用的 RAR 内置版，无需下载或安装引擎。RAR 官方评估期限最长 40 天；继续使用需你自己的有效许可证。不要分发此应用包。";
 "rar.license.localEvaluation" = "未导入 · 仅适用官方评估许可";
 "rar.localLicenseNote" = "可导入你自己购买且授权覆盖当前电脑的 rarreg.key，用于本机长期使用。本应用不提供、生成或共享 RAR 许可证。";
+"finder.title" = "Finder 右键快速压缩";
+"finder.description" = "右键文件或文件夹 → 服务 → Arcora。快速 ZIP / 7z / RAR 在原文件旁生成不加密的压缩包，完成后自动定位结果。密码、分卷等参数请用“自定义压缩”。";
+"finder.refresh" = "刷新右键菜单";
+"finder.showApp" = "在 Finder 显示本应用";
+"finder.installNote" = "将应用移到“应用程序”并启动一次。菜单未显示时，在系统设置 → 键盘 → 键盘快捷键 → 服务 → 文件和文件夹中启用 Arcora。菜单位置和语言由 Finder 决定。";
+"finder.refreshed" = "已请求刷新。请重新打开 Finder 右键菜单；若仍未显示，请在“服务”快捷键设置中启用。不会自动改写用户禁用的服务。";
+"finder.chooseDestination" = "请选择压缩包保存位置：所选文件来自不同文件夹，或原目录不可写。";
+"finder.configureRAR" = "打开设置，配置 RAR 引擎和许可证";
+"finder.queueFull" = "等待中的 Finder 请求过多，请完成或取消当前面板后重试。";

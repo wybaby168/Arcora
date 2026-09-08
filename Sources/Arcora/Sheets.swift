@@ -21,8 +21,9 @@ struct CreateSheet:View {
         self.model=model
         _sources=State(initialValue:inputs)
         _parent=State(initialValue:inputs.first?.deletingLastPathComponent() ?? FileManager.default.urls(for:.downloadsDirectory,in:.userDomainMask)[0])
-        _name=State(initialValue:inputs.count==1 ? (inputs[0].deletingPathExtension().lastPathComponent.isEmpty ? "Archive" : inputs[0].deletingPathExtension().lastPathComponent) : "Archive")
-        var defaults=CompressionOptions(); defaults.threads=min(4,max(1,model.preferences.totalThreads));_options=State(initialValue:defaults)
+        let directory=(try? inputs.first?.resourceValues(forKeys:[.isDirectoryKey]).isDirectory)==true
+        _name=State(initialValue:inputs.count==1 ? (directory ? inputs[0].lastPathComponent : inputs[0].deletingPathExtension().lastPathComponent) : "Archive")
+        var defaults=CompressionOptions(); defaults.format=model.createFormat;defaults.threads=min(4,max(1,model.preferences.totalThreads));_options=State(initialValue:defaults)
     }
     var body:some View {
         VStack(spacing:0) {
@@ -50,6 +51,9 @@ struct CreateSheet:View {
                         Label(model.t("rar.importToCreate"),systemImage:"key.fill").font(.system(size:11)).foregroundStyle(.orange)
                     } else if options.format == .rar {
                         Label(model.t("rar.capabilities"),systemImage:"checkmark.circle").font(.system(size:11)).foregroundStyle(.secondary)
+                    }
+                    if options.format == .rar && !model.canCreateRAR {
+                        SettingsLink {Label(model.t("finder.configureRAR"),systemImage:"gearshape")}.font(.system(size:11))
                     }
                     if options.format.singleStream {Text(model.t("compression.singleStream")).font(.system(size:11)).foregroundStyle(.secondary)}
                     GroupBox {

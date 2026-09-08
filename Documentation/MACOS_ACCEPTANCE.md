@@ -4,10 +4,11 @@
 
 ## 构建与加载
 
-- [ ] Xcode 15.3 / Swift 5.10 或选定生产工具链完整编译 SwiftUI / AppKit / C。
+- [ ] Xcode 26+ 选定生产工具链完整编译 SwiftUI / AppKit / C 和原生图标资源；产物部署目标仍为 macOS 14。
 - [ ] arm64 和 x86_64 Universal 三个自有程序及 7zz 架构验证通过。
 - [ ] Apple Silicon 原生启动，Intel 实机或等价可靠环境原生启动，不把 Rosetta 运行当成 Intel 原生验收。
 - [ ] 三语资源 Bundle、InfoPlist.strings、图标、许可和对应引擎源码都在 App 内。
+- [ ] `check-icon-assets.py` 确认原生 Assets.car、三种外观图标栈及 CFBundleIconName；Finder 实机预览没有二次缩小或灰色外底板。
 - [ ] Developer ID、hardened runtime、notarization、staple、Gatekeeper 下载路径均通过。
 - [ ] macOS 14 上静态 libarchive / liblzma 与 SDK 动态依赖实际运行通过。
 
@@ -24,7 +25,7 @@
 ## 交互与性能
 
 - [ ] 浅 / 深色与三语 UI 无截断，⌘N/O/E/T、VoiceOver 基本可用。
-- [ ] Finder 打开方式、Services 压缩入口、拖放、选择多个文件、剪贴板和 Finder reveal。
+- [ ] Finder 打开方式、Services 压缩入口、拖放、选择多个文件、剪贴板和 Finder reveal。1.3.0 的本机右键实测与剩余边界见 [FINDER_VALIDATION.md](FINDER_VALIDATION.md)；不代替干净系统验收。
 - [ ] Quick Look 预览 100 MiB 限制、关闭清理、切换档案取消旧预览。
 - [ ] 同时提交多个大任务，线程 / 并行数预算正确，任务状态无竞态。
 - [ ] 暂停 / 恢复 / 取消 / 关闭应用 / 错误后重试；无残留运行的受控工作进程。

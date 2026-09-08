@@ -9,6 +9,8 @@ else
   echo 'Source export without Git metadata: run the staged public-tree audit before publishing from a repository.'
 fi
 python3 Scripts/check-localization.py
+python3 Scripts/check-finder-services.py
+python3 Scripts/check-icon-assets.py
 for file in Scripts/*.sh; do bash -n "$file"; done
 swift build
 swift test

@@ -50,6 +50,9 @@ if [ "${ARCORA_RAR_CODEC_EVALUATION:-0}" = 1 ]; then
 else
   python3 Scripts/assert-distribution-clean.py "$STAGING" --allow-local-test-encoder
 fi
+python3 Scripts/configure-local-finder-services.py "$STAGING"
+python3 Scripts/check-finder-services.py "$STAGING"
+bash Scripts/verify-brand-icon.sh "$STAGING"
 codesign --force --sign - "$STAGING"
 codesign --verify --deep --strict "$STAGING"
 # Only replace this script's known generated test artifact.

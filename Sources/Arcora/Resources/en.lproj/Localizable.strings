@@ -238,3 +238,12 @@
 "rar.localBundleNote" = "Local-only build with RAR included; no engine download or installation is needed. RAR's evaluation period is at most 40 days; continued use requires your own valid license. Do not distribute this app.";
 "rar.license.localEvaluation" = "Not imported · official evaluation terms apply";
 "rar.localLicenseNote" = "Import your purchased rarreg.key covering this computer for continued local use. This app does not provide, generate or share RAR licenses.";
+"finder.title" = "Finder quick compression";
+"finder.description" = "Right-click files or folders → Services → Arcora. Quick ZIP / 7z / RAR creates an unencrypted archive beside the originals and reveals the result. Use Custom Compression for passwords, volumes and other options.";
+"finder.refresh" = "Refresh Finder services";
+"finder.showApp" = "Show this application in Finder";
+"finder.installNote" = "Move the app to Applications and open it once. If menus are hidden, enable Arcora in System Settings → Keyboard → Keyboard Shortcuts → Services → Files and Folders. Finder controls menu placement and language.";
+"finder.refreshed" = "Refresh requested. Reopen Finder’s context menu. If the items are still absent, use the Services keyboard-shortcut settings; user-disabled services are not automatically re-enabled.";
+"finder.chooseDestination" = "Choose where to save the archive. The selection spans multiple folders, or its original folder is not writable.";
+"finder.configureRAR" = "Open Settings to configure the RAR engine and license";
+"finder.queueFull" = "Too many Finder requests are waiting. Finish or cancel the current dialog and try again.";

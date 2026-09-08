@@ -5,19 +5,34 @@ import ArcoraCore
 
 @main
 struct ArcoraApp: App {
-    @StateObject private var model=AppModel()
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var delegate
+    private var model:AppModel {delegate.model}
     var body: some Scene {
-        WindowGroup("Arcora") {
-            MainWindow(model:model)
-                .environment(\.locale,model.locale)
-                .preferredColorScheme(model.preferences.appearance == "dark" ? .dark : model.preferences.appearance == "light" ? .light : nil)
-                .onAppear { delegate.model=model; NSApp.servicesProvider=delegate }
-                .onOpenURL { model.open($0) }
-        }
+        WindowGroup("Arcora",id:"main",for:String.self) { _ in
+            ArchiveRootView(model:model)
+        } defaultValue: {"workspace"}
         .defaultSize(width:1080,height:730)
         .windowStyle(.titleBar)
-        .commands {
+        .commands { ArchiveCommands(model:model) }
+        Settings { ArchiveSettingsRoot(model:model) }
+    }
+}
+private struct ArchiveRootView:View {
+    @ObservedObject var model:AppModel
+    var body:some View {
+        MainWindow(model:model)
+            .environment(\.locale,model.locale)
+            .preferredColorScheme(model.preferences.appearance == "dark" ? .dark : model.preferences.appearance == "light" ? .light : nil)
+            .onOpenURL {model.open($0)}
+    }
+}
+private struct ArchiveSettingsRoot:View {
+    @ObservedObject var model:AppModel
+    var body:some View {SettingsView(model:model).environment(\.locale,model.locale)}
+}
+private struct ArchiveCommands:Commands {
+    @ObservedObject var model:AppModel
+    var body:some Commands {
             CommandGroup(replacing:.newItem) {
                 Button(model.t("action.new")){ model.presentCreate() }.keyboardShortcut("n")
                 Button(model.t("action.open")){ model.chooseArchive() }.keyboardShortcut("o")
@@ -31,15 +46,25 @@ struct ArcoraApp: App {
             CommandGroup(replacing:.help) {
                 Button(model.t("action.guide")){ model.showGuide=true }
             }
-        }
-        Settings { SettingsView(model:model).environment(\.locale,model.locale) }
     }
 }
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
-    weak var model:AppModel?
+    // Services can launch the app before any SwiftUI window appears.
+    // The delegate owns the model for the whole application lifetime.
+    let model=AppModel()
+    private let finderServices=FinderServicesProvider()
+    func applicationDidFinishLaunching(_ notification:Notification) {
+        finderServices.handler = { [weak self] request in
+            guard let self else {return}
+            self.model.reopenMainWindow?()
+            NSApp.activate(ignoringOtherApps:true)
+            self.model.receiveFinderRequest(request)
+        }
+        NSApp.servicesProvider=finderServices
+        NSUpdateDynamicServices()
+    }
     func applicationShouldTerminate(_ sender:NSApplication)->NSApplication.TerminateReply {
-        guard let model else { return .terminateNow }
         guard model.hasPendingWork else { model.prepareToQuit(); return .terminateNow }
         let alert=NSAlert(); alert.messageText=model.t("quit.title"); alert.informativeText=model.t("quit.detail")
         alert.addButton(withTitle:model.t("quit.cancelJobs")); alert.addButton(withTitle:model.t("action.back"))
@@ -50,11 +75,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             return .terminateLater
         }
         return .terminateCancel
-    }
-    @objc func compressFiles(_ pasteboard:NSPasteboard,userData:String?,error:AutoreleasingUnsafeMutablePointer<NSString>) {
-        if let urls=pasteboard.readObjects(forClasses:[NSURL.self],options:[.urlReadingFileURLsOnly:true]) as? [URL],!urls.isEmpty {
-            model?.presentCreate(urls); NSApp.activate(ignoringOtherApps:true)
-        }
     }
 }
 #else
