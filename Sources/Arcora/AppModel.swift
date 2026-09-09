@@ -365,17 +365,20 @@ final class AppModel:ObservableObject {
     }
     func dismissPassword() { showPassword=false; passwordContinuation=nil }
     func presentExtract(selected:Set<String>?=nil) {
-        guard let manifest else{return}
+        guard let manifest,!hasPresentedDialog else{return}
         extractionSelection=selected
         if manifest.encrypted && currentPassword==nil {
             askPassword { [weak self] secret in self?.currentPassword=secret; self?.showExtraction=true }
         } else { showExtraction=true }
     }
     func submitExtract(parent:URL,name:String) {
-        guard let manifest else{return}
+        guard showExtraction,let manifest else{return}
+        // Consume the presentation before enqueueing, so repeated activation
+        // cannot schedule the same sheet's extraction twice.
+        showExtraction=false
         let threads=max(1,min(4,preferences.totalThreads))
         enqueue(title:manifest.source.lastPathComponent,kind:"job.extract",plan:.extract(manifest.source,parent,name,extractionSelection,currentPassword?.copy(),threads,preferences.collision))
-        showExtraction=false; page = .activity
+        page = .activity
     }
     func requestTest() {
         guard let manifest else{return}

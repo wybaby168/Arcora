@@ -8,9 +8,11 @@ struct ArcoraApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var delegate
     private var model:AppModel {delegate.model}
     var body: some Scene {
-        WindowGroup("Arcora",id:"main",for:String.self) { _ in
+        // The archive, jobs and sheet state belong to one application-wide
+        // model. A WindowGroup lets file-open events create extra sheet hosts.
+        Window("Arcora",id:"main") {
             ArchiveRootView(model:model)
-        } defaultValue: {"workspace"}
+        }
         .defaultSize(width:1080,height:730)
         .windowStyle(.titleBar)
         .commands { ArchiveCommands(model:model) }
@@ -23,7 +25,6 @@ private struct ArchiveRootView:View {
         MainWindow(model:model)
             .environment(\.locale,model.locale)
             .preferredColorScheme(model.preferences.appearance == "dark" ? .dark : model.preferences.appearance == "light" ? .light : nil)
-            .onOpenURL {model.open($0)}
     }
 }
 private struct ArchiveSettingsRoot:View {
@@ -63,6 +64,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         NSApp.servicesProvider=finderServices
         NSUpdateDynamicServices()
+    }
+    func application(_ application:NSApplication,open urls:[URL]) {
+        // Route Finder/Open With events once, outside the view hierarchy.
+        // On a cold launch SwiftUI creates the primary Window; after closing
+        // it the retained openWindow action restores that same unique scene.
+        model.reopenMainWindow?()
+        application.activate(ignoringOtherApps:true)
+        for url in urls where url.isFileURL {model.open(url)}
+    }
+    func applicationShouldHandleReopen(_ sender:NSApplication,hasVisibleWindows flag:Bool)->Bool {
+        model.reopenMainWindow?()
+        return true
+    }
+    func applicationShouldTerminateAfterLastWindowClosed(_ sender:NSApplication)->Bool {
+        // Keep queued/running jobs alive, matching the previous WindowGroup.
+        false
     }
     func applicationShouldTerminate(_ sender:NSApplication)->NSApplication.TerminateReply {
         guard model.hasPendingWork else { model.prepareToQuit(); return .terminateNow }

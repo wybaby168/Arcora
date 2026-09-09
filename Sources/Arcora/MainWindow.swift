@@ -37,9 +37,8 @@ struct MainWindow:View {
         .tint(Color(red:0.28,green:0.36,blue:0.79))
         .onAppear {
             let action=openWindow
-            // A value-targeted WindowGroup reuses the existing workspace instead
-            // of making another window for every incoming Finder request.
-            model.reopenMainWindow={action(id:"main",value:"workspace")}
+            // A Window is unique: reopening only raises/restores the workspace.
+            model.reopenMainWindow={action(id:"main")}
             model.processFinderRequests()
         }
         .onChange(of:model.hasPresentedDialog) { _,presented in
