@@ -82,6 +82,23 @@ describes system-applied masks and native icon delivery. The
 [bundle icon keys](https://developer.apple.com/library/archive/documentation/General/Reference/InfoPlistKeyReference/Articles/CoreFoundationKeys.html)
 define the catalog name and legacy file fallback.
 
+## README web asset
+
+All three READMEs use [arcora-icon.png](Media/arcora-icon.png), a web-only
+derivative compressed through the [TinyPNG web compressor](https://tinypng.com/)
+on 2026-09-09. The downloaded PNG is 298,803 bytes, down from the master’s
+1,150,779 bytes (74.0% smaller). Its 1254 × 1254 dimensions and transparent
+background are retained; no resizing, cropping, or format conversion was used.
+TinyPNG uses lossy color quantization, so this is not a pixel-identical master.
+
+Web asset SHA-256:
+`a6a4efde4b5211d3ee61f5f5043e77f2ea3fbf4cecc716f646c0bb9fbc0fb10c`.
+
+The application resource and Icon Composer artwork remain byte-for-byte
+unchanged. Keep future web optimizations separate from those native sources.
+After updating the web asset, verify decoding, transparency, dimensions, and
+its appearance at the READMEs’ 112 px display size before publishing.
+
 ## Generation provenance
 
 The selected master was generated on 2026-09-08 using the **built-in image

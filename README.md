@@ -1,4 +1,4 @@
-<p align="center"><img src="Sources/Arcora/Resources/Brand/ArcoraIcon.png" width="112" height="112" alt="Arcora app icon"></p>
+<p align="center"><img src="Documentation/Media/arcora-icon.png" width="112" height="112" alt="Arcora app icon"></p>
 
 <h1 align="center">Arcora</h1>
 
