@@ -1,6 +1,6 @@
-# Arcora
-
 <p align="center"><img src="Sources/Arcora/Resources/Brand/ArcoraIcon.png" width="112" height="112" alt="Arcora app icon"></p>
+
+<h1 align="center">Arcora</h1>
 
 **A native macOS archive utility. Local files, native UI, transparent format support.**
 
@@ -13,6 +13,14 @@
 Arcora brings archive creation, browsing, extraction and integrity checks to a SwiftUI / AppKit application. It runs on Apple Silicon and Intel Macs and includes English, Simplified Chinese and Japanese interfaces. Archive contents stay on your Mac: no account, upload service, advertising SDK or telemetry.
 
 > This repository contains source code and build scripts, not a notarized installer. Standard builds include their runtime dependencies, but **do not include the proprietary RAR encoder or any RAR license**. RAR extraction works immediately; RAR creation requires the optional setup below.
+
+## See Arcora in action
+
+![Arcora interface tour: browse, search, preview, extract selected files, create encrypted split archives, check tasks, and configure Finder integration and optional RAR support](Documentation/Media/arcora-demo.webp)
+
+A 42-second tour of the real macOS interface: browse and extract, create and protect, then Finder integration and settings. Recorded with sample files; scene timing is edited, not a speed benchmark. RAR extraction is built in; creation requires the official encoder and your own license.
+
+[View the still overview](Documentation/Media/arcora-overview.png) · [Demo details](Documentation/README_MEDIA.md)
 
 ## Highlights
 

@@ -1,6 +1,6 @@
-# Arcora
-
 <p align="center"><img src="Sources/Arcora/Resources/Brand/ArcoraIcon.png" width="112" height="112" alt="Arcora 应用图标"></p>
+
+<h1 align="center">Arcora</h1>
 
 **原生 macOS 压缩工具。本地处理，原生界面，清晰的格式支持边界。**
 
@@ -13,6 +13,14 @@
 Arcora 使用 SwiftUI / AppKit 提供压缩、浏览、解压和完整性校验，支持 Apple Silicon 与 Intel Mac，内置简体中文、英文和日文界面。归档内容在本机处理，无需账号，没有文件上传服务、广告 SDK 或遥测。
 
 > 本仓库提供源码和构建脚本，不是已公证的安装包。标准构建内置运行依赖，但**不包含商业 RAR 编码器或任何 RAR 许可证**。RAR 解压开箱即用；创建 RAR 需要完成下文的可选配置。
+
+## 界面演示
+
+![Arcora 界面演示：浏览、搜索、预览、选中解压、加密分卷压缩、任务管理、Finder 集成与可选 RAR 配置](Documentation/Media/arcora-demo.webp)
+
+42 秒了解真实 macOS 界面：浏览与解压、压缩与保护，再到 Finder 集成和设置。使用示例文件录制，切换节奏经过剪辑，不代表性能测试。RAR 解压内置；RAR 创建需要官方编码器和用户自己的许可证。
+
+[查看静态总览](Documentation/Media/arcora-overview.png) · [演示说明](Documentation/README_MEDIA.md)
 
 ## 主要功能
 

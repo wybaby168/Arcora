@@ -1,6 +1,6 @@
-# Arcora
-
 <p align="center"><img src="Sources/Arcora/Resources/Brand/ArcoraIcon.png" width="112" height="112" alt="Arcora アプリアイコン"></p>
+
+<h1 align="center">Arcora</h1>
 
 **macOS ネイティブのアーカイブツール。ローカル処理、自然な操作感、明確な対応範囲。**
 
@@ -13,6 +13,14 @@
 Arcora は SwiftUI / AppKit で構築された、圧縮・閲覧・展開・整合性検査のためのアプリです。Apple Silicon と Intel Mac に対応し、日本語・英語・簡体字中国語の UI を備えています。アーカイブの内容は Mac 内で処理され、アカウント、アップロードサービス、広告 SDK、テレメトリーはありません。
 
 > このリポジトリはソースコードとビルドスクリプトを提供します。公証済みインストーラーではありません。標準ビルドは実行時依存関係を同梱しますが、**商用 RAR エンコーダーや RAR ライセンスは同梱しません**。RAR の展開はすぐに利用でき、RAR の作成には以下の追加設定が必要です。
+
+## インターフェースの紹介
+
+![Arcora の操作画面：閲覧、検索、プレビュー、選択項目の展開、暗号化・分割圧縮、タスク管理、Finder 連携とオプションの RAR 設定](Documentation/Media/arcora-demo.webp)
+
+実際の macOS 画面を 42 秒で紹介します。閲覧と展開、圧縮と保護、Finder 連携や設定までを確認できます。サンプルファイルを使用し、場面の切り替えは編集しています。速度のベンチマークではありません。RAR の展開は内蔵、作成には公式エンコーダーと利用者自身のライセンスが必要です。
+
+[静止画で全体を見る](Documentation/Media/arcora-overview.png) · [デモの詳細](Documentation/README_MEDIA.md)
 
 ## 主な機能
 
