@@ -1,5 +1,7 @@
 # Arcora
 
+<p align="center"><img src="Sources/Arcora/Resources/Brand/ArcoraIcon.png" width="112" height="112" alt="Arcora 应用图标"></p>
+
 **原生 macOS 压缩工具。本地处理，原生界面，清晰的格式支持边界。**
 
 [English](README.md) · [简体中文](README.zh-CN.md) · [日本語](README.ja.md)
@@ -15,6 +17,7 @@ Arcora 使用 SwiftUI / AppKit 提供压缩、浏览、解压和完整性校验�
 ## 主要功能
 
 - 原生归档浏览器：拖放、Finder 集成、搜索、排序、选中解压与 Quick Look。
+- Finder 右键快速创建 ZIP、7z 和可选 RAR，并保留自定义压缩入口。
 - 创建 7z、ZIP、TAR 系列及单文件压缩流，可选创建 RAR5。
 - 按格式提供加密和分卷，7z / RAR 支持加密文件名。
 - 任务队列、进度、暂停、继续、取消，以及线程和内存预算。
@@ -36,7 +39,7 @@ Arcora 使用 SwiftUI / AppKit 提供压缩、浏览、解压和完整性校验�
 
 ## 构建与运行
 
-需要 macOS 14+、Xcode 15.3+ 且已选择对应命令行工具，以及 Python 3。首次准备依赖需要联网。
+构建需要 macOS 26+、Xcode 26+、已选择的对应命令行工具，以及 Python 3。构建机需要新版 CoreUI 工具来验证原生图标资源；生成的应用仍支持 macOS 14+。首次准备依赖需要联网。
 
 ```bash
 git clone https://github.com/wybaby168/Arcora.git
@@ -49,6 +52,18 @@ open dist/Arcora.app
 依赖脚本获取官方 7-Zip 26.03、libarchive 3.8.9 和 XZ 5.8.3 资产并校验固定 SHA-256。构建脚本生成 arm64 / x86_64 通用应用，保留所需上游原始源码包和许可说明。版本与摘要见 [engines.lock.json](Vendor/engines.lock.json)。
 
 默认使用用于本地开发的 **ad-hoc 签名**。Developer ID 签名、Apple 公证和干净机器验收属于单独的[发行流程](Documentation/RELEASE.md)。Arcora 不会关闭 Gatekeeper，也不会通过清除下载隔离属性绕过 macOS 检查。
+
+## Finder 右键快速压缩
+
+将构建好的应用移入**应用程序**（系统或当前用户的 Applications 目录），打开一次。然后在 Finder 选中文件或文件夹，右键选择**服务 → Arcora — 快速压缩为 ZIP / 7z / RAR**。
+
+快速操作默认创建**不加密**的压缩包，完成后校验，输出到原文件旁，保留原件；遇到同名自动编号，不覆盖。多个选中项合并成一个压缩包；来自不同目录时会询问输出位置。Arcora 显示进度并支持取消，完成后在 Finder 定位结果。应用未启动时也可通过服务直接启动。
+
+macOS 可能先要求确认“运行服务”，允许后才交付所选文件；应用保留这项系统安全检查。
+
+需要密码、分卷或其他设置时，选择 **Arcora — 自定义压缩…**。快速 RAR 与应用共用引擎和许可证检查；尚未配置时打开 RAR 设置表单，不会悄悄改为其他格式。
+
+菜单未出现时，可在**设置 → 通用 → Finder 右键快速压缩**点击“刷新右键菜单”，并检查**系统设置 → 键盘 → 键盘快捷键 → 服务 → 文件和文件夹**。菜单位置和菜单语言由 macOS 决定；Arcora 不会强制启用用户关闭的服务。详见 [Finder 使用说明](Documentation/FINDER_SERVICES.md)及[本机验证记录](Documentation/FINDER_VALIDATION.md)。
 
 ## 可选 RAR 创建
 

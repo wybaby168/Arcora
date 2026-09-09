@@ -9,6 +9,7 @@ struct SettingsView:View {
     private struct LicenseSelection:Identifiable {let url:URL;var id:URL {url}}
     @State private var licenseFile:LicenseSelection?
     @State private var showRemoveEngine=false
+    @State private var finderRefreshed=false
     var body:some View {
         TabView {
             general.tabItem{Label(model.t("settings.general"),systemImage:"slider.horizontal.3")}
@@ -36,6 +37,14 @@ struct SettingsView:View {
                     Text(model.t("collision.rename")).tag(CollisionPolicy.rename);Text(model.t("collision.fail")).tag(CollisionPolicy.fail)
                 }
                 Toggle(model.t("settings.reveal"),isOn:$model.preferences.revealAfterFinish)
+            }
+            Section(model.t("finder.title")) {
+                Text(model.t("finder.description")).font(.system(size:11)).foregroundStyle(.secondary)
+                HStack {
+                    Button(model.t("finder.refresh")){NSUpdateDynamicServices();finderRefreshed=true}
+                    Button(model.t("finder.showApp")){NSWorkspace.shared.activateFileViewerSelecting([Bundle.main.bundleURL])}
+                }
+                Text(model.t(finderRefreshed ? "finder.refreshed" : "finder.installNote")).font(.system(size:10)).foregroundStyle(.secondary)
             }
             Section(model.t("settings.privacy")) {
                 Text(model.t("privacy.details")).font(.system(size:11)).foregroundStyle(.secondary)
@@ -116,7 +125,7 @@ struct SettingsView:View {
                     Link(model.t("rar.purchaseLicense"),destination:URL(string:"https://www.rarlab.com/registration.php")!)
                     Link(model.t("rar.licenseTerms"),destination:URL(string:"https://www.rarlab.com/license.htm")!)
                 }.font(.system(size:11))
-            }.disabled(model.hasPendingWork)
+            }.disabled(model.hasCodecWork)
         }.formStyle(.grouped)
     }
     private var licenseStatusKey:String {
@@ -127,9 +136,9 @@ struct SettingsView:View {
     private var about:some View {
         VStack(spacing:17) {
             Spacer(minLength:12)
-            Image(systemName:"archivebox.fill").font(.system(size:52,weight:.light)).foregroundStyle(Color.accentColor)
+            BrandIcon(size:88)
             Text("Arcora").font(.system(size:30,weight:.semibold,design:.rounded))
-            Text((Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.2.0")+" · Arcora").font(.system(size:11)).foregroundStyle(.secondary)
+            Text((Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.3.0")+" · Arcora").font(.system(size:11)).foregroundStyle(.secondary)
             Text(model.t("app.tagline")).foregroundStyle(.secondary)
             Divider().padding(.horizontal,70)
             Text(model.t("about.description")).font(.system(size:12)).foregroundStyle(.secondary).multilineTextAlignment(.center).lineSpacing(5).padding(.horizontal,35)

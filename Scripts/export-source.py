@@ -2,6 +2,8 @@
 """Export source and public build dependencies; never export local RAR engines."""
 import hashlib
 from pathlib import Path
+import plistlib
+import re
 import zipfile
 
 root = Path(__file__).resolve().parents[1]
@@ -32,7 +34,10 @@ manifest = "".join(hashlib.sha256(path.read_bytes()).hexdigest() + "  " + str(pa
 # Generated build manifest, not hand-maintained source.
 (root / "SHA256SUMS.txt").write_text(manifest, encoding="utf-8")
 files.append(root / "SHA256SUMS.txt")
-output = root / "dist/Arcora-1.2.0-RAR-Customer-License-Source.zip"
+version = plistlib.loads((root / "Configuration/Info.plist").read_bytes())["CFBundleShortVersionString"]
+if not re.fullmatch(r"[0-9]+(?:\.[0-9]+){1,2}", version):
+    raise SystemExit("Invalid source export version")
+output = root / ("dist/Arcora-" + version + "-RAR-Customer-License-Source.zip")
 output.parent.mkdir(exist_ok=True)
 staged = output.with_suffix(".zip.partial")
 with zipfile.ZipFile(staged, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=9) as archive:

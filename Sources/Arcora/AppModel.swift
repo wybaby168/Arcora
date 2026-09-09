@@ -4,7 +4,7 @@ import AppKit
 import SwiftUI
 import ArcoraCore
 
-private enum LocalizationResources {
+enum AppResources {
     static let bundle:Bundle = {
         for parent in [Bundle.main.resourceURL,Optional(Bundle.main.bundleURL)].compactMap({$0}) {
             for name in ["Arcora_Arcora.bundle","Arcora_Arcora.resources"] {
@@ -74,6 +74,7 @@ struct JobItem:Identifiable {
     var plan:JobPlan?
     let control=JobControl()
     var requestedPassword=false
+    var revealOnSuccess=false
     init(title:String,kind:String,plan:JobPlan) {
         id=UUID(); self.title=title; self.kind=kind; state = .queued; self.plan=plan; requestedPassword=plan.secret != nil
     }
@@ -126,6 +127,11 @@ final class AppModel:ObservableObject {
     let rarLicenseStore=RARLicenseStore()
     let rarInstallationStore=RARInstallationStore()
     var createSources:[URL]=[]
+    var createFormat:ArchiveFormat = .sevenZip
+    var reopenMainWindow:(()->Void)?
+    private var finderRequests=[FinderCompressionRequest]()
+    private var handlingFinderRequest=false
+    private var finderRequestRevision=UUID()
     var extractionSelection:Set<String>?
     private var currentPassword:Secret?
     private var inspectionControl:JobControl?
@@ -157,7 +163,7 @@ final class AppModel:ObservableObject {
         return raw.hasPrefix("zh") ? "zh-Hans" : raw.hasPrefix("ja") ? "ja" : "en"
     }
     func t(_ key:String)->String {
-        let resources=LocalizationResources.bundle
+        let resources=AppResources.bundle
         // SwiftPM lowercases lproj names (zh-hans); Bundle lookup is case-sensitive.
         let localization=resources.localizations.first{$0.caseInsensitiveCompare(languageCode) == .orderedSame} ?? "en"
         guard let path=resources.path(forResource:localization,ofType:"lproj"),let bundle=Bundle(path:path) else { return key }
@@ -178,7 +184,7 @@ final class AppModel:ObservableObject {
     }
     var canCreateRAR:Bool {engines.rar != nil && (!engines.rarRequiresLicense || rarLicenseState == .verified) && !checkingRARLicense && !importingRARPackage}
     func importRARPackage(_ file:URL) {
-        guard !hasPendingWork,!checkingRARLicense,!importingRARPackage else {return}
+        guard !hasCodecWork,!checkingRARLicense,!importingRARPackage else {return}
         importingRARPackage=true;rarSetupError=nil
         let store=rarInstallationStore
         Task {
@@ -189,7 +195,7 @@ final class AppModel:ObservableObject {
         }
     }
     func removeRARPackage() {
-        guard !hasPendingWork,!checkingRARLicense,!importingRARPackage else {return}
+        guard !hasCodecWork,!checkingRARLicense,!importingRARPackage else {return}
         do {
             try rarInstallationStore.moveImportedCopyToTrash()
             engineLocations=EngineLocations.discover();rarLicenseState = .missing;rarSetupError=nil
@@ -198,16 +204,17 @@ final class AppModel:ObservableObject {
     func refreshRARLicense() {
         guard !checkingRARLicense,!importingRARPackage else {return}
         engineLocations=EngineLocations.discover()
-        guard let engine=engines.rar else {rarLicenseState = .missing;return}
+        guard let engine=engines.rar else {rarLicenseState = .missing;processFinderRequests();return}
         checkingRARLicense=true
         let store=rarLicenseStore
         Task {
             let state=await Task.detached(priority:.utility) {store.status(using:engine)}.value
             self.rarLicenseState=state;self.checkingRARLicense=false
+            self.processFinderRequests()
         }
     }
     func importRARLicense(_ file:URL,rightsAcknowledged:Bool) {
-        guard !hasPendingWork,!checkingRARLicense,!importingRARPackage,let engine=try? engines.requireRAR() else {return}
+        guard !hasCodecWork,!checkingRARLicense,!importingRARPackage,let engine=try? engines.requireRAR() else {return}
         checkingRARLicense=true;rarSetupError=nil
         let store=rarLicenseStore
         Task {
@@ -218,14 +225,17 @@ final class AppModel:ObservableObject {
         }
     }
     func removeRARLicense() {
-        guard !hasPendingWork,!checkingRARLicense,!importingRARPackage else {return}
+        guard !hasCodecWork,!checkingRARLicense,!importingRARPackage else {return}
         do {try rarLicenseStore.moveImportedCopyToTrash();rarLicenseState = .missing}
         catch {report(error)}
     }
     var service:ArchiveService { ArchiveService(engines:engines,limits:limits) }
     var activeJobs:[JobItem] { jobs.filter{!$0.state.terminal} }
-    var hasPendingWork:Bool { isLoading || !activeJobs.isEmpty || isPreviewing }
-    var hasRunningWork:Bool { isLoading || isPreviewing || jobs.contains{ $0.state == .running || $0.state == .paused } }
+    // Undispatched Finder requests have not captured engine state. They must not
+    // lock RAR setup while the user resolves a pending request's missing engine.
+    var hasCodecWork:Bool {isLoading || !activeJobs.isEmpty || isPreviewing || handlingFinderRequest}
+    var hasPendingWork:Bool {hasCodecWork || !finderRequests.isEmpty}
+    var hasRunningWork:Bool { isLoading || isPreviewing || handlingFinderRequest || jobs.contains{ $0.state == .running || $0.state == .paused } }
     private func rebuildRows() {
         rowsTask?.cancel()
         let revision=UUID(); rowsRevision=revision
@@ -295,8 +305,45 @@ final class AppModel:ObservableObject {
         archiveRevision=UUID(); inspectionControl?.cancel(); isLoading=false
         manifest=nil; currentFolder=""; search=""; selection=[]; currentPassword?.clear(); currentPassword=nil
     }
-    func presentCreate(_ files:[URL]=[]) {
-        createSources=files; showCreate=true
+    func presentCreate(_ files:[URL]=[],format:ArchiveFormat = .sevenZip) {
+        createSources=files;createFormat=format;showCreate=true
+    }
+    var hasPresentedDialog:Bool {showCreate || showExtraction || showPassword || showGuide || previewURL != nil || error != nil}
+    func receiveFinderRequest(_ request:FinderCompressionRequest) {
+        guard finderRequests.count<32 else {report(ArchiveError.resourceLimit(t("finder.queueFull")));return}
+        finderRequests.append(request)
+        processFinderRequests()
+    }
+    func processFinderRequests() {
+        guard !hasPresentedDialog,!handlingFinderRequest,let request=finderRequests.first else {return}
+        if request.action == .rar && (checkingRARLicense || importingRARPackage) {return}
+        finderRequests.removeFirst();handlingFinderRequest=true
+        let revision=finderRequestRevision
+        // Return to the Services caller before filesystem work or destination UI.
+        Task { @MainActor in
+            defer {self.handlingFinderRequest=false;self.processFinderRequests()}
+            do {
+                let plan=try await Task.detached(priority:.userInitiated) {try FinderCompressionPlan(request:request)}.value
+                guard self.finderRequestRevision==revision else {return}
+                if self.hasPresentedDialog {self.finderRequests.insert(request,at:0);return}
+                guard let format=request.action.format else {self.presentCreate(plan.files);return}
+                if format == .rar && !self.canCreateRAR {
+                    self.presentCreate(plan.files,format:.rar);return
+                }
+                let directory:URL
+                if let sibling=plan.siblingDirectory,FileManager.default.isWritableFile(atPath:sibling.path) {directory=sibling}
+                else {
+                    let initial=plan.siblingDirectory ?? FileManager.default.urls(for:.downloadsDirectory,in:.userDomainMask)[0]
+                    guard let selected=FolderPicker.choose(message:self.t("finder.chooseDestination"),initial:initial) else {return}
+                    directory=selected
+                }
+                let options=FinderCompressionPlan.quickOptions(format:format,threads:self.preferences.totalThreads)
+                try options.validate(hasPassword:false)
+                self.enqueue(title:plan.name+"."+format.rawValue,kind:"job.create",
+                    plan:.create(plan.files,directory,plan.name,options,nil,.rename),revealOnSuccess:true)
+                self.page = .activity
+            } catch {self.report(error)}
+        }
     }
     func handleDrop(_ files:[URL]) {
         guard !files.isEmpty else{return}
@@ -318,17 +365,20 @@ final class AppModel:ObservableObject {
     }
     func dismissPassword() { showPassword=false; passwordContinuation=nil }
     func presentExtract(selected:Set<String>?=nil) {
-        guard let manifest else{return}
+        guard let manifest,!hasPresentedDialog else{return}
         extractionSelection=selected
         if manifest.encrypted && currentPassword==nil {
             askPassword { [weak self] secret in self?.currentPassword=secret; self?.showExtraction=true }
         } else { showExtraction=true }
     }
     func submitExtract(parent:URL,name:String) {
-        guard let manifest else{return}
+        guard showExtraction,let manifest else{return}
+        // Consume the presentation before enqueueing, so repeated activation
+        // cannot schedule the same sheet's extraction twice.
+        showExtraction=false
         let threads=max(1,min(4,preferences.totalThreads))
         enqueue(title:manifest.source.lastPathComponent,kind:"job.extract",plan:.extract(manifest.source,parent,name,extractionSelection,currentPassword?.copy(),threads,preferences.collision))
-        showExtraction=false; page = .activity
+        page = .activity
     }
     func requestTest() {
         guard let manifest else{return}
@@ -349,8 +399,9 @@ final class AppModel:ObservableObject {
             showCreate=false; page = .activity
         } catch { report(error) }
     }
-    private func enqueue(title:String,kind:String,plan:JobPlan) {
-        jobs.append(JobItem(title:title,kind:kind,plan:plan)); persistHistory(); pump()
+    private func enqueue(title:String,kind:String,plan:JobPlan,revealOnSuccess:Bool=false) {
+        var job=JobItem(title:title,kind:kind,plan:plan);job.revealOnSuccess=revealOnSuccess
+        jobs.append(job); persistHistory(); pump()
     }
     func pump() {
         let running=jobs.filter{$0.state == .running || $0.state == .paused}
@@ -380,7 +431,7 @@ final class AppModel:ObservableObject {
             switch result {
             case .success(let output):
                 self.jobs[i].state = .succeeded; self.jobs[i].outputs=output.outputs; self.jobs[i].progress=ProgressEvent("phase.complete",fraction:1)
-                if self.preferences.revealAfterFinish,!output.outputs.isEmpty { NSWorkspace.shared.activateFileViewerSelecting(output.outputs) }
+                if (self.preferences.revealAfterFinish || self.jobs[i].revealOnSuccess),!output.outputs.isEmpty { NSWorkspace.shared.activateFileViewerSelecting(output.outputs) }
             case .failure(let error):
                 self.jobs[i].state=(error as? ArchiveError) == .cancelled ? .cancelled : .failed
                 self.jobs[i].errorKey=(error as? ArchiveError)?.localizationKey ?? "error.io"
@@ -399,12 +450,15 @@ final class AppModel:ObservableObject {
         jobs[i].control.cancel()
         if jobs[i].state == .queued { jobs[i].state = .cancelled; jobs[i].plan?.secret?.clear(); jobs[i].plan=jobs[i].plan?.replacingSecret(nil);persistHistory();pump() }
     }
-    func cancelAll() { inspectionControl?.cancel(); previewControl?.cancel(); for job in jobs where !job.state.terminal {cancel(job.id)} }
+    func cancelAll() {
+        finderRequestRevision=UUID();finderRequests.removeAll()
+        inspectionControl?.cancel(); previewControl?.cancel(); for job in jobs where !job.state.terminal {cancel(job.id)}
+    }
     func retry(_ id:UUID) {
         guard let job=jobs.first(where:{$0.id==id}),let plan=job.plan else{return}
         if job.requestedPassword || job.errorKey=="error.passwordRequired" || job.errorKey=="error.wrongPassword" {
-            askPassword { [weak self] secret in self?.enqueue(title:job.title,kind:job.kind,plan:plan.replacingSecret(secret)) }
-        } else { enqueue(title:job.title,kind:job.kind,plan:plan) }
+            askPassword { [weak self] secret in self?.enqueue(title:job.title,kind:job.kind,plan:plan.replacingSecret(secret),revealOnSuccess:job.revealOnSuccess) }
+        } else { enqueue(title:job.title,kind:job.kind,plan:plan,revealOnSuccess:job.revealOnSuccess) }
     }
     func clearHistory() { jobs.removeAll{$0.state.terminal};persistHistory() }
     func clearRecents() { recents=[];UserDefaults.standard.removeObject(forKey:"Arcora.recents") }

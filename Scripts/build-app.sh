@@ -3,8 +3,13 @@
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
-[ "$(uname -s)" = Darwin ] || { echo 'Building the GUI requires a Mac with Xcode 15.3+ (Xcode 16+ recommended).' >&2; exit 1; }
+[ "$(uname -s)" = Darwin ] || { echo 'Building the app requires a Mac with Xcode 26+.' >&2; exit 1; }
+ICON_MACOS_MAJOR="$(sw_vers -productVersion | cut -d. -f1)"
+[[ "$ICON_MACOS_MAJOR" =~ ^[0-9]+$ ]] && [ "$ICON_MACOS_MAJOR" -ge 26 ] || { echo 'The full app build requires macOS 26+ to validate native icon stacks. The built app still runs on macOS 14+.' >&2; exit 1; }
 xcrun --find swift >/dev/null
+ICON_XCODE_MAJOR="$(xcodebuild -version | awk 'NR==1 { split($2, version, "."); print version[1] }')"
+[[ "$ICON_XCODE_MAJOR" =~ ^[0-9]+$ ]] && [ "$ICON_XCODE_MAJOR" -ge 26 ] || { echo 'Select Xcode 26+ to compile the native macOS icon. The app still runs on macOS 14+.' >&2; exit 1; }
+python3 Scripts/check-icon-assets.py
 [ -x Vendor/7zip/7zz ] || { echo 'Run Scripts/bootstrap-engines.sh first.' >&2; exit 1; }
 [ "$(cat Vendor/7zip/platform.txt)" = mac ] || { echo 'The cached engine is not a macOS binary. Bootstrap on this Mac first.' >&2; exit 1; }
 [ -f Vendor/UpstreamSource/7z2603-src.tar.xz ] || { echo 'Corresponding upstream source is required; run bootstrap-engines.sh.' >&2; exit 1; }
@@ -38,6 +43,7 @@ RESOURCES="$(find "$ARM" -maxdepth 1 -type d \( -name 'Arcora_Arcora.bundle' -o 
 cp -R "$RESOURCES" "$TMP_APP/Contents/Resources/"
 cp Configuration/Info.plist "$TMP_APP/Contents/Info.plist"
 cp -R Configuration/en.lproj Configuration/zh-Hans.lproj Configuration/ja.lproj "$TMP_APP/Contents/Resources/"
+python3 Scripts/check-finder-services.py "$TMP_APP"
 printf 'APPL????' > "$TMP_APP/Contents/PkgInfo"
 cp LICENSE THIRD_PARTY_NOTICES.md "$TMP_APP/Contents/Resources/ThirdParty/"
 cp -R Vendor/7zip/Licenses "$TMP_APP/Contents/Resources/ThirdParty/7-Zip-Licenses"
@@ -48,6 +54,9 @@ cp Vendor/libarchive/XZ-COPYING "$TMP_APP/Contents/Resources/ThirdParty/XZ-COPYI
 cp Documentation/USER_GUIDE.md "$TMP_APP/Contents/Resources/"
 python3 Scripts/assert-distribution-clean.py "$TMP_APP"
 xcrun swift Scripts/make-icon.swift "$TMP_APP/Contents/Resources/Arcora.icns"
+xcrun swift Scripts/verify-icon.swift "$TMP_APP/Contents/Resources/Arcora.icns"
+python3 Scripts/check-icon-assets.py "$TMP_APP"
+bash Scripts/verify-brand-icon.sh "$TMP_APP"
 chmod 755 "$TMP_APP/Contents/MacOS/Arcora" "$TMP_APP/Contents/Helpers/"*
 plutil -lint "$TMP_APP/Contents/Info.plist"
 IDENTITY="${SIGN_IDENTITY:--}"  # ad-hoc by default; not Developer ID or notarization

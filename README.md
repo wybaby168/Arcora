@@ -1,5 +1,7 @@
 # Arcora
 
+<p align="center"><img src="Sources/Arcora/Resources/Brand/ArcoraIcon.png" width="112" height="112" alt="Arcora app icon"></p>
+
 **A native macOS archive utility. Local files, native UI, transparent format support.**
 
 [English](README.md) · [简体中文](README.zh-CN.md) · [日本語](README.ja.md)
@@ -15,6 +17,7 @@ Arcora brings archive creation, browsing, extraction and integrity checks to a S
 ## Highlights
 
 - Native archive browser with drag and drop, Finder integration, search, sorting, selected extraction and Quick Look.
+- Finder right-click quick ZIP, 7z and optional RAR creation, plus a custom compression action.
 - Create 7z, ZIP, TAR-based archives and single-file compressed streams; optionally create RAR5.
 - Encryption and split volumes where the format supports them, including encrypted file names for 7z and RAR.
 - A task queue with progress, pause, resume, cancellation and thread / memory budgets.
@@ -36,7 +39,7 @@ See the [detailed support matrix](Documentation/FORMAT_SUPPORT.md) for additiona
 
 ## Build and run
 
-Requirements: macOS 14 or later, Xcode 15.3 or later with its command-line tools selected, and Python 3. Initial dependency preparation requires internet access.
+Build requirements: macOS 26 or later, Xcode 26 or later with its command-line tools selected, and Python 3. The build host needs the newer CoreUI tools to verify native icon stacks; the built app still targets macOS 14 or later. Initial dependency preparation requires internet access.
 
 ```bash
 git clone https://github.com/wybaby168/Arcora.git
@@ -49,6 +52,20 @@ open dist/Arcora.app
 The bootstrap script verifies pinned SHA-256 values for official 7-Zip 26.03, libarchive 3.8.9 and XZ 5.8.3 assets. The build script produces a universal arm64 / x86_64 app and retains the required upstream source archives and notices. Versions and hashes live in [engines.lock.json](Vendor/engines.lock.json).
 
 Default signing is **ad-hoc**, for local development. Developer ID signing, Apple notarization and clean-machine acceptance are separate release steps; see [release instructions](Documentation/RELEASE.md). Arcora does not disable Gatekeeper or remove download quarantine to bypass macOS checks.
+
+## Finder quick compression
+
+Move the built app to **Applications** (the system or your user Applications folder), then open it once. Select files or folders in Finder, right-click and choose **Services → Arcora — Quick ZIP / Quick 7z / Quick RAR**.
+
+Quick actions create an **unencrypted**, verified archive beside the selected items, keep the originals and automatically number name collisions. Multiple selections become one archive; items from different locations prompt for an output folder. Tasks appear in Arcora with progress and cancellation, and Finder reveals the result. The app can start directly from the service.
+
+macOS may ask you to confirm **Run Service** before it hands over the files. This system safety check remains enabled.
+
+Choose **Arcora — Custom Compression…** for a password, split volumes or other settings. Quick RAR uses the same engine and license checks as the app; if setup is incomplete, it opens the RAR form without silently changing formats.
+
+If the actions are missing, use **Settings → General → Finder quick compression → Refresh Finder services**. Also check **System Settings → Keyboard → Keyboard Shortcuts → Services → Files and Folders**. Menu placement and menu language are controlled by macOS; Arcora does not force-enable services you have disabled. See the [Finder guide](Documentation/FINDER_SERVICES.md).
+
+The [Finder validation record](Documentation/FINDER_VALIDATION.md) distinguishes actual UI checks, automated coverage and remaining release gates.
 
 ## Optional RAR creation
 

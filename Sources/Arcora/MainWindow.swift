@@ -8,6 +8,7 @@ import ArcoraCore
 @MainActor
 struct MainWindow:View {
     @ObservedObject var model:AppModel
+    @Environment(\.openWindow) private var openWindow
     @State private var dropTarget=false
     var body:some View {
         NavigationSplitView {
@@ -34,6 +35,15 @@ struct MainWindow:View {
         }
         .frame(minWidth:940,minHeight:620)
         .tint(Color(red:0.28,green:0.36,blue:0.79))
+        .onAppear {
+            let action=openWindow
+            // A Window is unique: reopening only raises/restores the workspace.
+            model.reopenMainWindow={action(id:"main")}
+            model.processFinderRequests()
+        }
+        .onChange(of:model.hasPresentedDialog) { _,presented in
+            if !presented {model.processFinderRequests()}
+        }
         .toolbar {
             ToolbarItemGroup(placement:.automatic) {
                 Button {model.chooseArchive()} label:{Label(model.t("action.open"),systemImage:"folder")}.help(model.t("action.open"))
@@ -64,8 +74,7 @@ struct SidebarView:View {
     var body:some View {
         VStack(alignment:.leading,spacing:24) {
             HStack(spacing:10) {
-                Image(systemName:"archivebox.fill").font(.system(size:23,weight:.medium)).foregroundStyle(Color.accentColor)
-                    .frame(width:38,height:38).background(Color.accentColor.opacity(0.1),in:RoundedRectangle(cornerRadius:11))
+                BrandIcon(size:44)
                 VStack(alignment:.leading,spacing:1) {
                     Text("Arcora").font(.system(size:20,weight:.semibold,design:.rounded))
                     Text(model.t("app.descriptor")).font(.system(size:10,weight:.medium)).foregroundStyle(.secondary)

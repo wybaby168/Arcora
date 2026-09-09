@@ -1,4 +1,4 @@
-# Arcora 1.2.0
+# Arcora 1.3.0
 
 Native macOS 14+ archive utility. Build with Xcode and Python 3:
 
@@ -9,6 +9,8 @@ open dist/Arcora.app
 ```
 
 The universal app includes 7-Zip 26.03, libarchive 3.8.9 and liblzma 5.8.3. These included formats require no extra installation. Optional RAR creation has the one-time setup below.
+
+For Finder right-click compression, move the app to Applications and open it once. Select files or folders, then choose Services → Arcora — Quick ZIP / Quick 7z / Quick RAR. Quick actions keep originals and create a verified, unencrypted archive beside them, automatically numbering name collisions. Choose Custom Compression… for passwords or split volumes. Missing menus: Settings → General → Refresh Finder services; also check macOS Keyboard Shortcuts → Services. See [Finder guide](FINDER_SERVICES.md).
 
 RAR/RAR5 browsing, testing and extraction work immediately. To create RAR5, open Settings → Engines: open the official download for your Mac, import the original downloaded .tar.gz, then import your own purchased rarreg.key and confirm usage rights. No manual extraction, terminal, Homebrew or administrator installation is required. Solid compression, Unicode passwords, encrypted names and volumes are supported.
 

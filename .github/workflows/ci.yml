@@ -7,18 +7,23 @@ permissions:
   contents: read
 jobs:
   macos:
-    runs-on: macos-14
+    runs-on: macos-26
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_26.4.1.app/Contents/Developer
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
       - name: Toolchain
-        run: swift --version && xcodebuild -version
+        run: sw_vers && swift --version && xcodebuild -version
       - name: Public source and documentation guard
         run: |
           python3 Scripts/check-public-tree.py --self-test
           python3 Scripts/check-public-tree.py --staged
       - name: Localization completeness
-        run: python3 Scripts/check-localization.py
+        run: |
+          python3 Scripts/check-localization.py
+          python3 Scripts/check-finder-services.py
+          python3 Scripts/check-icon-assets.py
       - name: Pinned official engine and corresponding source
         run: Scripts/bootstrap-engines.sh
       - name: Native helper and application compilation
@@ -31,6 +36,9 @@ jobs:
         run: Scripts/build-app.sh
       - name: Verify the packaged app and distribution boundaries
         run: |
+          xcrun swift Scripts/verify-icon.swift dist/Arcora.app/Contents/Resources/Arcora.icns
+          python3 Scripts/check-icon-assets.py dist/Arcora.app
+          bash Scripts/verify-brand-icon.sh dist/Arcora.app
           python3 Scripts/assert-distribution-clean.py dist/Arcora.app
           python3 Scripts/verify-release-gates.py
           python3 Scripts/verify-app.py dist/Arcora.app
