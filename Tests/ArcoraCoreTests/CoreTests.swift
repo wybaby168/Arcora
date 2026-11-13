@@ -68,6 +68,14 @@ final class SecretAndArgumentsTests:ArcoraTestCase {
     func testWrongPasswordClassification() {XCTAssertThrowsError(try ProcessRunner.requireSuccess(ProcessResult(status:2,output:"Wrong password"),passwordSupplied:true)){XCTAssertEqual($0 as? ArchiveError,.wrongPassword)}}
 }
 final class MetadataTests:ArcoraTestCase {
+    func testSLTArchiveAndSplitHeadersAreExcluded()throws {
+        let text="7-Zip\n\n--\nPath = /tmp/sample.zip.001\nType = Split\nVolumes = 2\n----\nPath = sample.zip\nSize = 100\n--\nPath = sample.zip\nType = zip\n\n----------\nPath = data.txt\nSize = 12\n\n"
+        let entries=try SLTParser.parse(text,includesArchiveHeaders:true)
+        XCTAssertEqual(entries.map{$0.path},["data.txt"])
+    }
+    func testSLTHeaderModeRequiresTheEntrySection() {
+        XCTAssertThrowsError(try SLTParser.parse("--\nPath = /tmp/archive.zip\nType = zip\n",includesArchiveHeaders:true))
+    }
     func testSLTUnicodeDirectoryPassword()throws {
         let text="Path = 资料\nFolder = +\nSize = 0\n\nPath = 资料/日本語.txt\nSize = 42\nPacked Size = 12\nEncrypted = +\nModified = 2023-11-14 22:13:20.0000000\n\n"
         let e=try SLTParser.parse(text);XCTAssertEqual(e.count,2);XCTAssertTrue(e[0].isDirectory);XCTAssertEqual(e[1].size,42);XCTAssertTrue(e[1].isEncrypted);XCTAssertNotNil(e[1].modified)
@@ -129,6 +137,26 @@ final class ProcessExecutionTests:ArcoraTestCase {
         let code="import os; os.write(1,b'A'*2000000); os.write(2,b'B'*2000000)"
         let r=try ProcessRunner().run(EngineCommand(try python(),["-c",code]),outputLimit:8192)
         XCTAssertEqual(r.status,0);XCTAssertLessThanOrEqual(r.output.utf8.count,8192);XCTAssertTrue(r.output.contains("B"))
+    }
+    func testLargeListingRetainsMissingVolumeDiagnostic()throws {
+        let script="import os; os.write(2,b'ERROR: Missing volume : /tmp/Project files/archive.part02.rar\\n'); os.write(1,b'Path = regular-file.txt\\nSize = 1\\n\\n'*30000); raise SystemExit(2)"
+        let result=try ProcessRunner().run(EngineCommand(try python(),["-c",script]),outputLimit:2_000_000,captureAll:true)
+        XCTAssertTrue(result.output.contains("regular-file.txt"))
+        XCTAssertTrue(result.diagnostics.contains("archive.part02.rar"))
+        XCTAssertThrowsError(try ProcessRunner.requireSuccess(result,passwordSupplied:false)) {
+            XCTAssertEqual($0 as? ArchiveError,.missingVolume("archive.part02.rar"))
+        }
+    }
+    func testDiagnosticStreamIsRedactedIndependently()throws {
+        let script="import sys; password=sys.stdin.readline().strip(); print(password,file=sys.stderr); raise SystemExit(2)"
+        let result=try ProcessRunner().run(EngineCommand(try python(),["-c",script],secret:Secret("private-password"),passwordCopies:1))
+        XCTAssertFalse(result.diagnostics.contains("private-password"))
+        XCTAssertTrue(result.diagnostics.contains("<redacted>"))
+    }
+    func testUnexpectedEndIsAnIncompleteArchive() {
+        XCTAssertThrowsError(try ProcessRunner.requireSuccess(ProcessResult(status:2,output:"",diagnostics:"Unexpected end of archive"),passwordSupplied:false)) {
+            XCTAssertEqual($0 as? ArchiveError,.incompleteArchive)
+        }
     }
     func testFullCaptureFailsClosedAtLimit()throws {
         XCTAssertThrowsError(try ProcessRunner().run(EngineCommand(try python(),["-c","import os; os.write(1,b'A'*1000000)"]),outputLimit:4096,captureAll:true)) {guard case ArchiveError.resourceLimit = $0 else {return XCTFail("Unexpected: \($0)")}}

@@ -72,6 +72,8 @@ THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ```
 
+The eight `rar5-multipart.partNN.rar` fixtures are unchanged uudecoded volumes from `libarchive/test/test_read_format_rar5_multiarchive.partNN.rar.uu` in pinned libarchive 3.8.9. The same Grzegorz Antoniak notice above applies. Their exact hashes and usage are recorded in Documentation/FIXTURE_PROVENANCE.md.
+
 Other generated regression archives are created by `Scripts/generate-fixtures.py` from original artificial data. Malicious-path fixtures are inert test archives and should only be used in controlled tests; do not deliberately extract them with an unsafe third-party tool.
 
 The additional RAR4 fixtures rar4-windows.rar and rar4-solid-encrypted.rar are unchanged uudecoded files from libarchive v3.8.9. Their source names, hashes, and complete original notices are recorded in Documentation/RAR_FIXTURE_NOTICES.md. RAR archives generated during integration tests contain original artificial test data and are removed with their temporary test directories.

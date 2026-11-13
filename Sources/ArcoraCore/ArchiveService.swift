@@ -13,6 +13,7 @@ public final class ArchiveService: @unchecked Sendable {
         try control.waitWhilePaused()
         let volumes=try VolumeResolver.resolve(input.standardizedFileURL)
         let source=volumes.first
+        try PathSafety.safeListPath(source.path)
         progress?(ProgressEvent("phase.reading",detail:source.lastPathComponent))
         let nativeFirst=(preferNative(source) && !volumes.isMultipart) || engines.sevenZip==nil
         if nativeFirst {
@@ -31,7 +32,7 @@ public final class ArchiveService: @unchecked Sendable {
             }
             throw error
         }
-        let entries=try SLTParser.parse(result.output,limit:limits.maxEntries)
+        let entries=try SLTParser.parse(result.output,limit:limits.maxEntries,includesArchiveHeaders:true)
         try PathSafety.validateListing(entries,limits:limits)
         return ArchiveManifest(source:source,backend:.sevenZip,entries:entries,format:source.pathExtension.uppercased())
     }

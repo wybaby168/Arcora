@@ -45,6 +45,7 @@ arcora inspect ARCHIVE [--password-stdin]
 arcora extract ARCHIVE --to DIRECTORY [--name NAME] [--select PATH ...] [--password-stdin]
 arcora create --format 7z|zip|rar|tar|tar.gz|tar.bz2|tar.xz|gz|bz2|xz --output FILE [options] -- INPUT...
 arcora test ARCHIVE [--password-stdin]
+arcora split ARCHIVE --to DIRECTORY --volume '2 GiB' [--name NAME]
 arcora engines
 arcora rar-package-info
 arcora rar-package-import /path/to/rarmacos-ARCH-723.tar.gz
@@ -133,6 +134,13 @@ func main() throws {
     guard let collision=CollisionPolicy(rawValue:args.value("collision") ?? "rename") else {throw ArchiveError.invalid("Invalid collision policy.")}
     var result:OperationResult?
     switch args.command {
+    case "split":
+        guard args.positional.count==1,let path=args.positional.first,
+              let size=try VolumeResolver.parseSize(args.require("volume")) else {
+            throw ArchiveError.invalid("Choose an archive and a part size such as 2 GiB.")
+        }
+        result=try service.split(URL(fileURLWithPath:path),to:URL(fileURLWithPath:args.require("to")),
+            name:args.value("name"),partBytes:size,collision:collision,control:control,progress:progress)
     case "inspect","extract","test":
         guard args.positional.count==1,let first=args.positional.first else{throw ArchiveError.invalid("Missing archive path.")}
         let source=URL(fileURLWithPath:first)

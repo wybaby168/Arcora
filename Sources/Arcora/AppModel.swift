@@ -35,18 +35,24 @@ enum JobPlan: @unchecked Sendable {
     case create([URL],URL,String,CompressionOptions,Secret?,CollisionPolicy)
     case extract(URL,URL,String,Set<String>?,Secret?,Int,CollisionPolicy)
     case test(URL,Secret?,Int)
+    case split(URL,URL,String,UInt64,CollisionPolicy)
     var secret:Secret? {
-        switch self { case .create(_,_,_,_,let p,_):return p; case .extract(_,_,_,_,let p,_,_):return p; case .test(_,let p,_):return p }
+        switch self { case .create(_,_,_,_,let p,_):return p; case .extract(_,_,_,_,let p,_,_):return p; case .test(_,let p,_):return p;case .split:return nil }
     }
     var threads:Int {
-        switch self { case .create(_,_,_,let o,_,_):return o.threads; case .extract(_,_,_,_,_,let n,_),.test(_,_,let n):return n }
+        switch self { case .create(_,_,_,let o,_,_):return o.threads; case .extract(_,_,_,_,_,let n,_),.test(_,_,let n):return n;case .split:return 1 }
     }
-    var memory:UInt64 { if case .create(_,_,_,let o,_,_)=self {return o.estimatedMemoryBytes}; return 512*1_048_576 }
+    var memory:UInt64 {
+        if case .create(_,_,_,let o,_,_)=self {return o.estimatedMemoryBytes}
+        if case .split=self {return 16*1_048_576}
+        return 512*1_048_576
+    }
     func replacingSecret(_ secret:Secret?)->JobPlan {
         switch self {
         case let .create(inputs,parent,name,options,_,collision): return .create(inputs,parent,name,options,secret,collision)
         case let .extract(input,parent,name,selection,_,threads,collision): return .extract(input,parent,name,selection,secret,threads,collision)
         case let .test(input,_,threads):return .test(input,secret,threads)
+        case .split:return self
         }
     }
     func perform(_ service:ArchiveService,control:JobControl,progress:@escaping ProgressSink)throws->OperationResult {
@@ -56,6 +62,8 @@ enum JobPlan: @unchecked Sendable {
         case let .extract(input,parent,name,selection,secret,threads,collision):
             return try service.extract(input,to:parent,name:name,selection:selection,password:secret,threads:threads,collision:collision,control:control,progress:progress)
         case let .test(input,secret,threads):return try service.test(input,password:secret,threads:threads,control:control,progress:progress)
+        case let .split(input,parent,name,size,collision):
+            return try service.split(input,to:parent,name:name,partBytes:size,collision:collision,control:control,progress:progress)
         }
     }
 }
@@ -65,6 +73,8 @@ struct JobItem:Identifiable {
     var kind:String
     var state:JobState
     var progress=ProgressEvent("phase.waiting")
+    var phaseStarted:Date?
+    var phasePauseSeconds:TimeInterval=0
     var created=Date()
     var started:Date?
     var finished:Date?
@@ -108,13 +118,7 @@ struct ArchiveRow:Identifiable,Sendable {
 final class AppModel:ObservableObject {
     @Published var preferences:Preferences { didSet { savePreferences() } }
     @Published var page:SectionPage = .workspace
-    @Published var manifest:ArchiveManifest? {
-        didSet {
-            metadataOnlyCount=manifest?.entries.filter{$0.isMetadataOnly}.count ?? 0
-            rebuildRows()
-        }
-    }
-    @Published private(set) var metadataOnlyCount=0
+    @Published var manifest:ArchiveManifest? {didSet {rebuildRows()}}
     @Published var isLoading=false
     @Published var currentFolder="" { didSet { rebuildRows() } }
     @Published var search="" { didSet { rebuildRows() } }
@@ -125,6 +129,7 @@ final class AppModel:ObservableObject {
     @Published var showExtraction=false
     @Published var showPassword=false
     @Published var showGuide=false
+    @Published var splitSource:URL?
     @Published var error:UIError?
     @Published var previewURL:URL?
     @Published var isPreviewing=false
@@ -138,7 +143,9 @@ final class AppModel:ObservableObject {
     var createSources:[URL]=[]
     var createFormat:ArchiveFormat = .sevenZip
     var reopenMainWindow:(()->Void)?
-    private var finderRequests=[FinderCompressionRequest]()
+    @Published private var finderRequests=[FinderCompressionRequest]()
+    private var currentFinderRequest:FinderCompressionRequest?
+    var pendingFinderCount:Int {finderRequests.count}
     private var handlingFinderRequest=false
     private var finderRequestRevision=UUID()
     var extractionSelection:Set<String>?
@@ -321,16 +328,35 @@ final class AppModel:ObservableObject {
     func presentCreate(_ files:[URL]=[],format:ArchiveFormat = .sevenZip) {
         createSources=files;createFormat=format;showCreate=true
     }
-    var hasPresentedDialog:Bool {showCreate || showExtraction || showPassword || showGuide || previewURL != nil || error != nil}
+    var hasPresentedForm:Bool {showCreate || showExtraction || showPassword || showGuide || splitSource != nil || previewURL != nil}
+    var hasPresentedDialog:Bool {hasPresentedForm || error != nil}
+    func requestSplit() {
+        guard !hasPresentedDialog else {return}
+        if let source=manifest?.source {splitSource=source;return}
+        let panel=NSOpenPanel()
+        panel.canChooseDirectories=false;panel.allowsMultipleSelection=false
+        panel.message=t("action.split");panel.prompt=t("action.choose")
+        if panel.runModal() == .OK {splitSource=panel.url}
+    }
+    func submitSplit(source:URL,parent:URL,name:String,partSize:String) {
+        do {
+            guard let size=try VolumeResolver.parseSize(partSize) else {throw ArchiveError.invalid(t("volume.placeholder"))}
+            try PathSafety.safeFilename(name+".parts")
+            enqueue(title:name,kind:"job.split",plan:.split(source,parent,name,size,preferences.collision))
+            splitSource=nil;page = .activity
+        } catch {report(error)}
+    }
     func receiveFinderRequest(_ request:FinderCompressionRequest) {
+        if currentFinderRequest?.matches(request)==true || finderRequests.contains(where:{$0.matches(request)}) {return}
         guard finderRequests.count<32 else {report(ArchiveError.resourceLimit(t("finder.queueFull")));return}
         finderRequests.append(request)
         processFinderRequests()
     }
     func processFinderRequests() {
+        if !hasPresentedDialog && !handlingFinderRequest {currentFinderRequest=nil}
         guard !hasPresentedDialog,!handlingFinderRequest,let request=finderRequests.first else {return}
         if request.action == .rar && (checkingRARLicense || importingRARPackage) {return}
-        finderRequests.removeFirst();handlingFinderRequest=true
+        finderRequests.removeFirst();handlingFinderRequest=true;currentFinderRequest=request
         let revision=finderRequestRevision
         // Return to the Services caller before filesystem work or destination UI.
         Task { @MainActor in
@@ -339,17 +365,32 @@ final class AppModel:ObservableObject {
                 let plan=try await Task.detached(priority:.userInitiated) {try FinderCompressionPlan(request:request)}.value
                 guard self.finderRequestRevision==revision else {return}
                 if self.hasPresentedDialog {self.finderRequests.insert(request,at:0);return}
-                guard let format=request.action.format else {self.presentCreate(plan.files);return}
-                if format == .rar && !self.canCreateRAR {
+                if request.action == .custom {self.presentCreate(plan.files);return}
+                if request.action == .rar && !self.canCreateRAR {
                     self.presentCreate(plan.files,format:.rar);return
                 }
                 let directory:URL
-                if let sibling=plan.siblingDirectory,FileManager.default.isWritableFile(atPath:sibling.path) {directory=sibling}
+                if request.action != .extractTo,let sibling=plan.siblingDirectory,FileManager.default.isWritableFile(atPath:sibling.path) {directory=sibling}
                 else {
                     let initial=plan.siblingDirectory ?? FileManager.default.urls(for:.downloadsDirectory,in:.userDomainMask)[0]
-                    guard let selected=FolderPicker.choose(message:self.t("finder.chooseDestination"),initial:initial) else {return}
+                    let message=request.action.isExtraction ? "finder.extractDestination" : "finder.chooseDestination"
+                    guard let selected=FolderPicker.choose(message:self.t(message),initial:initial) else {return}
                     directory=selected
                 }
+                if request.action.isExtraction {
+                    let sources=try await Task.detached(priority:.userInitiated) {
+                        var seen=Set<URL>()
+                        return try plan.files.map{try VolumeResolver.resolve($0).first}.filter{seen.insert($0).inserted}
+                    }.value
+                    guard self.finderRequestRevision==revision else {return}
+                    for source in sources {
+                        self.enqueue(title:source.lastPathComponent,kind:"job.extract",
+                            plan:.extract(source,directory,ArchiveService.defaultFolderName(source),nil,nil,
+                                          max(1,min(4,self.preferences.totalThreads)),.rename),revealOnSuccess:true)
+                    }
+                    self.page = .activity;return
+                }
+                guard let format=request.action.format else {return}
                 let options=FinderCompressionPlan.quickOptions(format:format,threads:self.preferences.totalThreads)
                 try options.validate(hasPassword:false)
                 self.enqueue(title:plan.name+"."+format.rawValue,kind:"job.create",
@@ -433,7 +474,13 @@ final class AppModel:ObservableObject {
         let id=jobs[index].id,control=jobs[index].control,service=self.service
         jobs[index].state = .running; jobs[index].started=Date(); persistHistory()
         let receiveProgress:@MainActor @Sendable (ProgressEvent)->Void = { [weak self] value in
-            if let self,let i=self.jobs.firstIndex(where:{$0.id==id}),!self.jobs[i].state.terminal {self.jobs[i].progress=value}
+            if let self,let i=self.jobs.firstIndex(where:{$0.id==id}),!self.jobs[i].state.terminal {
+                if self.jobs[i].progress.phase != value.phase {
+                    self.jobs[i].phaseStarted=Date()
+                    self.jobs[i].phasePauseSeconds=control.pausedDuration
+                }
+                self.jobs[i].progress=value
+            }
         }
         Task {
             let result=await Task.detached(priority:.userInitiated) { ()->Result<OperationResult,Error> in
@@ -451,7 +498,7 @@ final class AppModel:ObservableObject {
             case .failure(let error):
                 self.jobs[i].state=(error as? ArchiveError) == .cancelled ? .cancelled : .failed
                 self.jobs[i].errorKey=(error as? ArchiveError)?.localizationKey ?? "error.io"
-                self.jobs[i].errorDetail=error.localizedDescription
+                self.jobs[i].errorDetail=self.localizedErrorDetail(error)
             }
             // Keep a non-secret retry plan, never a previous password.
             self.jobs[i].plan=plan.replacingSecret(nil)
@@ -467,7 +514,7 @@ final class AppModel:ObservableObject {
         if jobs[i].state == .queued { jobs[i].state = .cancelled; jobs[i].plan?.secret?.clear(); jobs[i].plan=jobs[i].plan?.replacingSecret(nil);persistHistory();pump() }
     }
     func cancelAll() {
-        finderRequestRevision=UUID();finderRequests.removeAll()
+        finderRequestRevision=UUID();finderRequests.removeAll();currentFinderRequest=nil
         inspectionControl?.cancel(); previewControl?.cancel(); for job in jobs where !job.state.terminal {cancel(job.id)}
     }
     func retry(_ id:UUID) {
@@ -480,11 +527,29 @@ final class AppModel:ObservableObject {
     func clearRecents() { recents=[];UserDefaults.standard.removeObject(forKey:"Arcora.recents") }
     func enter(_ row:ArchiveRow) {
         if row.isMetadataOnly {
-            var detail=row.path
-            if let target=row.linkTarget { detail+="\n"+t("browser.linkTarget")+" "+target }
-            error=UIError(title:t("action.entryInfo"),detail:detail+"\n\n"+t("browser.metadataOnly"))
+            showEntryInfo(row)
         } else if row.isDirectory {currentFolder=row.path;search="";selection=[]}
         else {preview(row)}
+    }
+    var canQuickLook:Bool {selection.count==1 && !isLoading && !hasPresentedDialog}
+    func quickLookSelection() {
+        if isPreviewing {previewControl?.cancel();return}
+        guard canQuickLook,let path=selection.first,let row=rows.first(where:{$0.path==path}) else {return}
+        if row.isMetadataOnly || row.isDirectory {showEntryInfo(row)}
+        else {preview(row)}
+    }
+    private func showEntryInfo(_ row:ArchiveRow) {
+        var detail=row.path
+        if let target=row.linkTarget {detail+="\n"+t("browser.linkTarget")+" "+target}
+        if row.isMetadataOnly {detail+="\n\n"+t("browser.metadataOnly")}
+        else if let entries=try? manifest?.selectedEntries([row.path]) {
+            let bytes=entries.reduce(UInt64(0)) { total,entry in
+                let sum=total.addingReportingOverflow(entry.size)
+                return sum.overflow ? UInt64.max : sum.partialValue
+            }
+            detail+="\n\n\(entries.count) "+t("browser.entries")+" · "+ByteCountFormatter.string(fromByteCount:Int64(clamping:bytes),countStyle:.file)
+        }
+        error=UIError(title:t("action.entryInfo"),detail:detail)
     }
     func preview(_ row:ArchiveRow) {
         guard let manifest,!row.isDirectory,!row.isMetadataOnly,!isPreviewing else{return}
@@ -509,11 +574,16 @@ final class AppModel:ObservableObject {
         if let items=try? FileManager.default.contentsOfDirectory(at:previews,includingPropertiesForKeys:nil) { for item in items {try? FileManager.default.removeItem(at:item)} }
     }
     func prepareToQuit() { currentPassword?.clear(); rowsTask?.cancel(); dismissPreview(); try? FileManager.default.removeItem(at:previews) }
-    func report(_ e:Error) {
+    private func localizedErrorDetail(_ e:Error)->String {
         let detail:String
         if case .metadataOnly(let path)=e as? ArchiveError { detail=t("browser.metadataOnly")+"\n\n"+path }
+        else if case .missingVolume(let name)=e as? ArchiveError {detail=(name.isEmpty ? "" : name+"\n\n")+t("error.volumeRecovery")}
+        else if case .incompleteArchive=e as? ArchiveError {detail=t("error.incompleteRecovery")}
         else { detail=e.localizedDescription }
-        error=UIError(title:t((e as? ArchiveError)?.localizationKey ?? "error.io"),detail:detail)
+        return detail
+    }
+    func report(_ e:Error) {
+        error=UIError(title:t((e as? ArchiveError)?.localizationKey ?? "error.io"),detail:localizedErrorDetail(e))
     }
     private func savePreferences() {
         if let data=try? JSONEncoder().encode(preferences) {UserDefaults.standard.set(data,forKey:"Arcora.preferences")}

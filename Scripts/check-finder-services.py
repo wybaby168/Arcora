@@ -13,7 +13,8 @@ args=parser.parse_args()
 folder=args.app/"Contents" if args.app else root/"Configuration"
 resources=folder/"Resources" if args.app else folder
 info=plistlib.loads((folder/"Info.plist").read_bytes())
-expected={"zip":"Arcora — Quick ZIP","7z":"Arcora — Quick 7z","rar":"Arcora — Quick RAR","custom":"Arcora — Custom Compression…"}
+expected={"zip":"Arcora — Quick ZIP","7z":"Arcora — Quick 7z","rar":"Arcora — Quick RAR","custom":"Arcora — Custom Compression…",
+          "extract":"Arcora — Extract Archive","extract-to":"Arcora — Extract to Folder…"}
 if info["CFBundleIdentifier"] in ("app.arcora.desktop.rar-evaluation","app.arcora.desktop.rar-codec-evaluation"):
     prefix="Arcora Personal" if info.get("ArcoraRARLocalEvaluation") is True else "Arcora RAR Test"
     expected={action:title.replace("Arcora —",prefix+" —",1) for action,title in expected.items()}
@@ -25,8 +26,10 @@ for service in services:
     assert service["NSMessage"]=="compressFiles"
     assert service.get("NSPortName")==info["CFBundleName"],"The service port must match the app's registered name"
     assert service.get("NSRequiredContext")=={},"Explicit file-selection context required"
-    assert "public.item" in service.get("NSSendFileTypes",[]),"Regular files and folders must both match"
-    assert service.get("NSRestricted") is True,"Do not let sandboxed clients use file processing to escape their sandbox"
+    selection_type="public.data" if service["NSUserData"] in ("extract","extract-to") else "public.item"
+    assert selection_type in service.get("NSSendFileTypes",[]),"The file-selection type must match the action"
+    assert service.get("NSRestricted") is False,"File actions must avoid the extra restricted-service confirmation"
+    assert not service.get("NSReturnTypes"),"File services accept selections without returning file contents to callers"
 keys=set(expected.values())|{"Arcora could not accept this file selection. Open Arcora and try again."}
 for language in ("en","zh-Hans","ja"):
     values={}
@@ -38,4 +41,4 @@ for language in ("en","zh-Hans","ja"):
         assert key not in values and value,"Duplicate or empty service translation"
         values[key]=value
     assert set(values)==keys,"Missing service translations: "+language
-print("PASS: 4 Finder file/folder services; matching dispatch actions and 3 complete menu translations")
+print("PASS: 6 Finder services; matching dispatch actions and 3 complete menu translations")

@@ -82,7 +82,7 @@
 	<key>CFBundleShortVersionString</key>
 	<string>1.3.0</string>
 	<key>CFBundleVersion</key>
-	<string>9</string>
+	<string>11</string>
 	<key>LSApplicationCategoryType</key>
 	<string>public.app-category.utilities</string>
 	<key>LSMinimumSystemVersion</key>
@@ -112,7 +112,7 @@
 			<key>NSRequiredContext</key>
 			<dict/>
 			<key>NSRestricted</key>
-			<true/>
+			<false/>
 			<key>NSSendTypes</key>
 			<array>
 				<string>NSFilenamesPboardType</string>
@@ -127,7 +127,7 @@
 			<key>NSSendFileTypes</key><array><string>public.item</string></array>
 			<key>NSSendTypes</key><array><string>NSFilenamesPboardType</string><string>public.file-url</string></array>
 			<key>NSRequiredContext</key><dict/>
-			<key>NSRestricted</key><true/>
+			<key>NSRestricted</key><false/>
 		</dict>
 		<dict>
 			<key>NSMenuItem</key><dict><key>default</key><string>Arcora — Quick RAR</string></dict>
@@ -137,7 +137,7 @@
 			<key>NSSendFileTypes</key><array><string>public.item</string></array>
 			<key>NSSendTypes</key><array><string>NSFilenamesPboardType</string><string>public.file-url</string></array>
 			<key>NSRequiredContext</key><dict/>
-			<key>NSRestricted</key><true/>
+			<key>NSRestricted</key><false/>
 		</dict>
 		<dict>
 			<key>NSMenuItem</key><dict><key>default</key><string>Arcora — Custom Compression…</string></dict>
@@ -147,7 +147,27 @@
 			<key>NSSendFileTypes</key><array><string>public.item</string></array>
 			<key>NSSendTypes</key><array><string>NSFilenamesPboardType</string><string>public.file-url</string></array>
 			<key>NSRequiredContext</key><dict/>
-			<key>NSRestricted</key><true/>
+			<key>NSRestricted</key><false/>
+		</dict>
+		<dict>
+			<key>NSMenuItem</key><dict><key>default</key><string>Arcora — Extract Archive</string></dict>
+			<key>NSMessage</key><string>compressFiles</string>
+			<key>NSPortName</key><string>Arcora</string>
+			<key>NSUserData</key><string>extract</string>
+			<key>NSSendFileTypes</key><array><string>public.data</string></array>
+			<key>NSSendTypes</key><array><string>NSFilenamesPboardType</string><string>public.file-url</string></array>
+			<key>NSRequiredContext</key><dict/>
+			<key>NSRestricted</key><false/>
+		</dict>
+		<dict>
+			<key>NSMenuItem</key><dict><key>default</key><string>Arcora — Extract to Folder…</string></dict>
+			<key>NSMessage</key><string>compressFiles</string>
+			<key>NSPortName</key><string>Arcora</string>
+			<key>NSUserData</key><string>extract-to</string>
+			<key>NSSendFileTypes</key><array><string>public.data</string></array>
+			<key>NSSendTypes</key><array><string>NSFilenamesPboardType</string><string>public.file-url</string></array>
+			<key>NSRequiredContext</key><dict/>
+			<key>NSRestricted</key><false/>
 		</dict>
 	</array>
 </dict>

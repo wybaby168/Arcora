@@ -25,6 +25,23 @@ final class FinderCompressionTests:ArcoraTestCase {
         XCTAssertEqual(plan.siblingDirectory,try PathSafety.physicalURL(temp))
         XCTAssertEqual(try String(contentsOf:file),"data")
     }
+    func testExtractionActionsAcceptArchiveFilesAndRejectFolders()throws {
+        let file=try touch("archive.tar.gz")
+        for action in [FinderCompressionAction.extract,.extractTo] {
+            let request=try FinderCompressionRequest(files:[file],action:action)
+            let plan=try FinderCompressionPlan(request:request)
+            XCTAssertEqual(plan.files.count,1)
+            XCTAssertTrue(action.isExtraction)
+            XCTAssertNil(action.format)
+            XCTAssertThrowsError(try FinderCompressionPlan(request:FinderCompressionRequest(files:[temp],action:action)))
+        }
+    }
+    func testOptionRequestsMatchRegardlessOfSelectionOrder()throws {
+        let first=try touch("first.txt"),second=try touch("second.txt")
+        let request=try FinderCompressionRequest(files:[first,second],action:.custom)
+        XCTAssertTrue(request.matches(try FinderCompressionRequest(files:[second,first],action:.custom)))
+        XCTAssertFalse(request.matches(try FinderCompressionRequest(files:[first,second],action:.extractTo)))
+    }
     func testFolderWithDotsKeepsItsCompleteName()throws {
         _=try touch("项目.v1/data.txt")
         let folder=temp.appendingPathComponent("项目.v1")
@@ -73,6 +90,23 @@ final class FinderCompressionTests:ArcoraTestCase {
         XCTAssertNil(FinderCompressionAction.custom.format)
     }
     #if os(macOS)
+    func testRepeatedCustomServiceRequestsAreCoalescedBeforeLaunch()async throws {
+        let file=try touch("selected.txt")
+        await MainActor.run {
+            let board=NSPasteboard.withUniqueName();defer {board.releaseGlobally()}
+            board.writeObjects([file as NSURL])
+            let provider=FinderServicesProvider()
+            for _ in 0..<5 {
+                var error:NSString?
+                provider.compressFiles(board,userData:"custom",error:&error)
+                XCTAssertNil(error)
+            }
+            var requests=[FinderCompressionRequest]()
+            provider.handler={requests.append($0)}
+            XCTAssertEqual(requests.count,1)
+            XCTAssertEqual(requests.first?.files,[file])
+        }
+    }
     func testModernPasteboardKeepsEverySelectedFile()async throws {
         let first=try touch("中文 a.txt"),second=try touch("日本語 b.txt")
         try await MainActor.run {

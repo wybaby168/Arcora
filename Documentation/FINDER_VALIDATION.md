@@ -1,5 +1,22 @@
 # Finder integration validation — 1.3.0
 
+## Update — 2026-11-13, build 11
+
+Validated on macOS 27.0.1, Apple Silicon, with Xcode 27.0 / Swift 6.4. The standard universal app and separate local personal app built successfully; the personal app was installed locally and checked through its actual UI. The personal app is excluded from public Git and public artifacts.
+
+- The Debug suite completed 147 tests with 10 optional RAR-encoder tests skipped and no failures. Release tests of the same archive and service implementation had the same result. Packaged standard-app checks and release-refusal checks passed.
+- Six Services declarations and all three menu translations passed validation. Services now declare `NSRestricted = false`. This supersedes the restricted-service behavior recorded in the earlier baseline below.
+- Two consecutive real Services calls to **Extract to Folder…**, from the same Swift test client, opened the destination picker directly without a **Run Service** confirmation. Both extractions completed; every output file matched the ZIP's contents.
+- Two matching **Custom Compression…** requests submitted while its form was open produced one form and one valid archive, with no deferred second form. Distinct queued requests remain separate.
+- The packaged UI opened the selected file with Space and closed it with Space; Escape also closed the preview. Search-field spaces remained ordinary text input. The preview displayed the complete expected text.
+- A missing RAR5 next part produced the exact `rar5-multipart.part02.rar` filename and recovery instructions. Automated tests also cover the missing final part and the complete eight-volume set. Error details were selectable, copyable and scrollable; a long entry-information panel scrolled to its end.
+- Splitting an existing ZIP through the actual UI produced three 64 KiB-or-smaller numbered parts. Rejoining them reproduced the original bytes, and opening the first part with the packaged CLI extracted the original files exactly. The updated form exposes accessible name and part-size fields, with a 2 GiB default.
+- Compression duration estimates use measured progress in the current phase after work starts. They are estimates, not pre-run benchmarks for each compression level.
+
+These checks do not replace Developer ID signing, notarization, an Intel Mac or macOS 14 acceptance checks, or validation with a customer's own RAR license. See the repository's CI for the exact published revision.
+
+## Earlier baseline — 2026-09-08
+
 Date: 2026-09-08. Environment: macOS 26.6.2, Apple Silicon, Xcode 26.4.1 / Swift 6.3.1. This is local validation, not Developer ID signing, notarization or clean-machine acceptance.
 
 ## Automated results

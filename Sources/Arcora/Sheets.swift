@@ -27,7 +27,7 @@ struct CreateSheet:View {
     }
     var body:some View {
         VStack(spacing:0) {
-            SheetHeading(icon:"archivebox",title:model.t("compression.title"),subtitle:model.t("compression.subtitle"))
+            SheetHeading(icon:"archivebox",title:model.t("compression.title"))
             ScrollView {
                 VStack(alignment:.leading,spacing:19) {
                     sourcePanel
@@ -43,14 +43,24 @@ struct CreateSheet:View {
                                 }.labelsHidden().frame(width:195)
                                 Spacer().frame(width:184)
                             }
+                            if options.format.supportsVolumes {
+                                LabeledContent(model.t("field.volumes")) {
+                                    HStack(spacing:8) {
+                                        TextField(model.t("volume.none"),text:$volume).textFieldStyle(.roundedBorder)
+                                        Menu {
+                                            Button(model.t("volume.none")) {volume=""}
+                                            ForEach(["100 MiB","500 MiB","2 GiB"],id:\.self) {value in Button(value){volume=value}}
+                                        } label:{Image(systemName:"chevron.down")}
+                                            .menuStyle(.borderlessButton).menuIndicator(.hidden).fixedSize()
+                                    }.frame(width:385).help(model.t("volume.note"))
+                                }
+                            }
                         }.padding(9)
                     }
                     if options.format == .rar && model.engines.rar==nil {
                         Label(model.t("rar.notConfigured"),systemImage:"info.circle").font(.system(size:11)).foregroundStyle(.orange)
                     } else if options.format == .rar && !model.canCreateRAR {
                         Label(model.t("rar.importToCreate"),systemImage:"key.fill").font(.system(size:11)).foregroundStyle(.orange)
-                    } else if options.format == .rar {
-                        Label(model.t("rar.capabilities"),systemImage:"checkmark.circle").font(.system(size:11)).foregroundStyle(.secondary)
                     }
                     if options.format == .rar && !model.canCreateRAR {
                         SettingsLink {Label(model.t("finder.configureRAR"),systemImage:"gearshape")}.font(.system(size:11))
@@ -61,7 +71,7 @@ struct CreateSheet:View {
                             LabeledContent(model.t("field.level")) {
                                 Picker("",selection:$options.level) {
                                     ForEach(options.format.levels,id:\.self) {level in Text(model.t("level.\(level)")).tag(level)}
-                                }.labelsHidden().frame(width:385)
+                                }.labelsHidden().frame(width:385).help(model.t("compression.levelTime"))
                             }
                             LabeledContent(model.t("field.threads")) {
                                 Stepper(value:$options.threads,in:1...max(1,model.preferences.totalThreads)) {Text("\(options.threads)").monospacedDigit().frame(width:30,alignment:.trailing)}.frame(width:385,alignment:.leading)
@@ -76,16 +86,6 @@ struct CreateSheet:View {
                                         } else {Text(options.format == .zip ? "32 KiB · Deflate" : model.t("field.automatic")).foregroundStyle(.secondary)}
                                     }
                                     if options.format.supportsSolid {Toggle(model.t("field.solid"),isOn:$options.solid)}
-                                    if options.format.supportsVolumes {
-                                        LabeledContent(model.t("field.volumes")) {
-                                            TextField(model.t("volume.placeholder"),text:$volume).textFieldStyle(.roundedBorder).frame(width:200)
-                                        }
-                                        HStack(spacing:6) {
-                                            ForEach(["100 MiB","500 MiB","2 GiB"],id:\.self) {value in Button(value){volume=value}.font(.system(size:10))}
-                                            Button(model.t("volume.none")){volume=""}.font(.system(size:10))
-                                        }
-                                        Text(model.t("volume.note")).font(.system(size:10)).foregroundStyle(.secondary).fixedSize(horizontal:false,vertical:true)
-                                    }
                                     Toggle(model.t("field.verify"),isOn:$options.verifyAfterCreation)
                                 }.padding(.top,12)
                             }.font(.system(size:12))
@@ -103,7 +103,9 @@ struct CreateSheet:View {
             }
             Divider()
             HStack {
-                Label(model.t("compression.keepOriginals"),systemImage:"checkmark.shield").font(.system(size:10)).foregroundStyle(.secondary)
+                if model.pendingFinderCount>0 {
+                    Text("\(model.pendingFinderCount) "+model.t("finder.pending")).font(.system(size:11)).foregroundStyle(.secondary)
+                }
                 Spacer()
                 Button(model.t("action.cancel")){password="";confirmation="";dismiss()}.keyboardShortcut(.cancelAction)
                 Button(model.t("action.compress")){submit()}.buttonStyle(.borderedProminent).keyboardShortcut(.defaultAction)
@@ -219,7 +221,6 @@ struct ExtractionSheet:View {
                 LabeledContent(model.t("extraction.folder")) {TextField("",text:$name).textFieldStyle(.roundedBorder).frame(width:325)}
                 LabeledContent(model.t("extraction.scope")) {Text(model.extractionSelection==nil ? model.t("extraction.all") : "\(model.extractionSelection?.count ?? 0) "+model.t("browser.selected")).foregroundStyle(.secondary)}
                 Text(model.t("extraction.safeDestination")).font(.system(size:11)).foregroundStyle(.secondary).lineSpacing(4)
-                Label(model.t("extraction.volumesNote"),systemImage:"square.stack").font(.system(size:11)).foregroundStyle(.secondary)
                 if !validation.isEmpty {Text(validation).font(.system(size:11)).foregroundStyle(.orange)}
             }.padding(26)
             Divider()
@@ -257,14 +258,15 @@ struct PasswordSheet:View {
 }
 @MainActor
 struct SheetHeading:View {
-    let icon:String,title:String,subtitle:String
+    let icon:String,title:String
+    var subtitle=""
     var body:some View {
         HStack(spacing:13) {
             Image(systemName:icon).font(.system(size:25,weight:.light)).foregroundStyle(Color.accentColor)
                 .frame(width:46,height:46).background(Color.accentColor.opacity(0.08),in:RoundedRectangle(cornerRadius:12))
             VStack(alignment:.leading,spacing:5) {
                 Text(title).font(.system(size:20,weight:.semibold))
-                Text(subtitle).font(.system(size:11)).foregroundStyle(.secondary).lineLimit(2)
+                if !subtitle.isEmpty {Text(subtitle).font(.system(size:11)).foregroundStyle(.secondary).lineLimit(2)}
             }
             Spacer()
         }.padding(24)

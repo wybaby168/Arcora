@@ -24,8 +24,9 @@ A 42-second tour of the real macOS interface: browse and extract, create and pro
 
 ## Highlights
 
-- Native archive browser with drag and drop, Finder integration, search, sorting, selected extraction and Quick Look.
-- Finder right-click quick ZIP, 7z and optional RAR creation, plus a custom compression action.
+- Native archive browser with drag and drop, search, sorting, selected extraction and Space-key Quick Look.
+- Finder actions for quick ZIP, 7z and optional RAR creation, custom compression, and extraction beside the archive or to a chosen folder.
+- Split an existing archive into numbered parts while preserving its original bytes.
 - Create 7z, ZIP, TAR-based archives and single-file compressed streams; optionally create RAR5.
 - Encryption and split volumes where the format supports them, including encrypted file names for 7z and RAR.
 - A task queue with progress, pause, resume, cancellation and thread / memory budgets.
@@ -61,17 +62,19 @@ The bootstrap script verifies pinned SHA-256 values for official 7-Zip 26.03, li
 
 Default signing is **ad-hoc**, for local development. Developer ID signing, Apple notarization and clean-machine acceptance are separate release steps; see [release instructions](Documentation/RELEASE.md). Arcora does not disable Gatekeeper or remove download quarantine to bypass macOS checks.
 
-## Finder quick compression
+## Finder actions
+
+Select an archive in Finder and choose **Services → Arcora — Extract Archive** to create a new folder beside it, or **Extract to Folder…** to choose a destination. Matching pending custom-compression requests share one form.
+
+To split an existing ZIP, open it in Arcora and choose **Archive → Split Archive…**, then set the part size, such as **2 GiB**. The numbered parts can be opened directly in Arcora when kept together.
 
 Move the built app to **Applications** (the system or your user Applications folder), then open it once. Select files or folders in Finder, right-click and choose **Services → Arcora — Quick ZIP / Quick 7z / Quick RAR**.
 
 Quick actions create an **unencrypted**, verified archive beside the selected items, keep the originals and automatically number name collisions. Multiple selections become one archive; items from different locations prompt for an output folder. Tasks appear in Arcora with progress and cancellation, and Finder reveals the result. The app can start directly from the service.
 
-macOS may ask you to confirm **Run Service** before it hands over the files. This system safety check remains enabled.
-
 Choose **Arcora — Custom Compression…** for a password, split volumes or other settings. Quick RAR uses the same engine and license checks as the app; if setup is incomplete, it opens the RAR form without silently changing formats.
 
-If the actions are missing, use **Settings → General → Finder quick compression → Refresh Finder services**. Also check **System Settings → Keyboard → Keyboard Shortcuts → Services → Files and Folders**. Menu placement and menu language are controlled by macOS; Arcora does not force-enable services you have disabled. See the [Finder guide](Documentation/FINDER_SERVICES.md).
+If the actions are missing, use **Settings → General → Finder actions → Refresh Finder services**. Also check **System Settings → Keyboard → Keyboard Shortcuts → Services → Files and Folders**. Menu placement and menu language are controlled by macOS; Arcora does not force-enable services you have disabled. See the [Finder guide](Documentation/FINDER_SERVICES.md).
 
 The [Finder validation record](Documentation/FINDER_VALIDATION.md) distinguishes actual UI checks, automated coverage and remaining release gates.
 

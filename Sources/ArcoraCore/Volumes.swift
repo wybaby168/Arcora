@@ -7,6 +7,9 @@ public struct VolumeSet: Sendable {
 }
 public enum VolumeResolver {
     public static func resolve(_ url:URL) throws -> VolumeSet {
+        guard url.isFileURL,url.host==nil || url.host=="" || url.host=="localhost" else {
+            throw ArchiveError.invalid("Choose a local archive file.")
+        }
         let directory=url.deletingLastPathComponent()
         let filename=url.lastPathComponent
         let lower=filename.lowercased()
@@ -27,9 +30,16 @@ public enum VolumeResolver {
         }
         func validate(_ set:VolumeSet,_ pattern:String,_ start:Int) throws -> VolumeSet {
             guard FileManager.default.fileExists(atPath:set.first.path) else { throw ArchiveError.missingVolume(set.first.lastPathComponent) }
+            let expression=try NSRegularExpression(pattern:pattern,options:.caseInsensitive)
             for (offset,part) in set.parts.enumerated() {
                 guard let m=match(pattern,part.lastPathComponent),Int(m[1])==offset+start else {
-                    throw ArchiveError.missingVolume("Missing volume \(offset+start) near \(filename)")
+                    let name=part.lastPathComponent
+                    guard let match=expression.firstMatch(in:name,range:NSRange(name.startIndex...,in:name)),
+                          let range=Range(match.range(at:1),in:name) else {throw ArchiveError.missingVolume(name)}
+                    let number=String(offset+start),width=name[range].count
+                    let padded=String(repeating:"0",count:max(0,width-number.count))+number
+                    var missing=name;missing.replaceSubrange(range,with:padded)
+                    throw ArchiveError.missingVolume(missing)
                 }
             }
             return set
@@ -60,7 +70,8 @@ public enum VolumeResolver {
             if !rest.isEmpty {
                 guard let primary else { throw ArchiveError.missingVolume(base+".rar") }
                 for (index,part) in rest.enumerated() where part.0 != index {
-                    throw ArchiveError.missingVolume("Missing classic RAR volume \(index+2) near \(filename)")
+                    let letter=String(UnicodeScalar(Int(Character("r").asciiValue!)+index/100)!)
+                    throw ArchiveError.missingVolume(base+"."+letter+String(format:"%02d",index%100))
                 }
                 return VolumeSet(first:primary,parts:[primary]+rest.map{$0.1})
             }

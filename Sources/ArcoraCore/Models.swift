@@ -3,14 +3,16 @@ import Foundation
 public enum ArchiveError: Error, LocalizedError, Equatable {
     case invalid(String), unsafePath(String), metadataOnly(String), unsupported(String), missingEngine(String)
     case passwordRequired, wrongPassword, cancelled, timedOut
-    case missingVolume(String), collision(String), resourceLimit(String)
+    case missingVolume(String), incompleteArchive, collision(String), resourceLimit(String)
     case engine(Int32, String), io(String)
     case licenseRequired(String)
     public var errorDescription: String? {
         switch self {
         case .invalid(let s), .unsafePath(let s), .unsupported(let s), .missingEngine(let s),
-             .missingVolume(let s), .collision(let s), .resourceLimit(let s), .io(let s), .licenseRequired(let s): return s
+             .collision(let s), .resourceLimit(let s), .io(let s), .licenseRequired(let s): return s
+        case .missingVolume(let name): return name.isEmpty ? "A required archive volume is missing." : "Missing archive volume "+name
         case .passwordRequired: return "A password is required."
+        case .incompleteArchive: return "The archive is incomplete or truncated. Check that every part has finished downloading."
         case .metadataOnly(let path): return "This selection contains a link or special file. Select regular files to preview or extract. "+path
         case .wrongPassword: return "The password is incorrect, or the encrypted data is damaged."
         case .cancelled: return "The operation was cancelled."
@@ -30,6 +32,7 @@ public enum ArchiveError: Error, LocalizedError, Equatable {
         case .cancelled: return "state.cancelled"
         case .timedOut: return "error.timeout"
         case .missingVolume: return "error.volume"
+        case .incompleteArchive: return "error.incomplete"
         case .collision: return "error.collision"
         case .resourceLimit: return "error.limit"
         case .engine: return "error.operation"

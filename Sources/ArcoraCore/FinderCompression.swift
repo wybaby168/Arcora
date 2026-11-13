@@ -1,16 +1,19 @@
 import Foundation
 
 public enum FinderCompressionAction:String,CaseIterable,Sendable {
-    case zip, sevenZip="7z", rar, custom
+    case zip, sevenZip="7z", rar, custom, extract, extractTo="extract-to"
     public var format:ArchiveFormat? {
-        switch self {case .zip:return .zip;case .sevenZip:return .sevenZip;case .rar:return .rar;case .custom:return nil}
+        switch self {case .zip:return .zip;case .sevenZip:return .sevenZip;case .rar:return .rar;case .custom,.extract,.extractTo:return nil}
     }
+    public var isExtraction:Bool {self == .extract || self == .extractTo}
+    public var presentsOptions:Bool {self == .custom || self == .extractTo}
 }
 
 /// A file-selection snapshot, never shell text or a URL to download.
 public struct FinderCompressionRequest:Sendable {
     public let files:[URL]
     public let action:FinderCompressionAction
+    public func matches(_ other:FinderCompressionRequest)->Bool {action==other.action && Set(files)==Set(other.files)}
     public init(files:[URL],action:FinderCompressionAction)throws {
         guard !files.isEmpty,files.count<=10_000 else {throw ArchiveError.invalid("Select between 1 and 10,000 files or folders.")}
         guard files.allSatisfy({$0.isFileURL && ($0.host == nil || $0.host == "" || $0.host == "localhost")}) else {
@@ -36,6 +39,7 @@ public struct FinderCompressionPlan:Sendable {
         var unique=[URL](),directories=Set<String>()
         for input in request.files {
             let values=try input.resourceValues(forKeys:[.isDirectoryKey,.isRegularFileKey,.isSymbolicLinkKey])
+            if request.action.isExtraction,values.isDirectory==true {throw ArchiveError.invalid("Select archive files to extract.")}
             guard values.isSymbolicLink != true,values.isDirectory==true || values.isRegularFile==true else {
                 throw ArchiveError.unsafePath(input.path)
             }
@@ -95,8 +99,9 @@ public final class FinderServicesProvider:NSObject {
     @objc public func compressFiles(_ pasteboard:NSPasteboard,userData:String?,error errorPointer:AutoreleasingUnsafeMutablePointer<NSString?>) {
         do {
             guard let action=FinderCompressionAction(rawValue:userData ?? "custom") else {throw ArchiveError.invalid("Unknown Finder compression action.")}
-            guard pending.count<32 else {throw ArchiveError.resourceLimit("Too many pending Finder requests.")}
             let request=try FinderCompressionRequest(files:Self.files(from:pasteboard),action:action)
+            if action.presentsOptions,pending.contains(where:{$0.matches(request)}) {return}
+            guard pending.count<32 else {throw ArchiveError.resourceLimit("Too many pending Finder requests.")}
             pending.append(request);drain()
         } catch {
             // Services may log this string. Do not include selected paths or secrets.

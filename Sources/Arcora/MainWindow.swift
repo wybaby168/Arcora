@@ -56,16 +56,17 @@ struct MainWindow:View {
                 }
             }
         }
-        .sheet(isPresented:$model.showCreate) { CreateSheet(model:model,inputs:model.createSources) }
-        .sheet(isPresented:$model.showExtraction) { ExtractionSheet(model:model) }
-        .sheet(isPresented:$model.showPassword,onDismiss:{model.dismissPassword()}) { PasswordSheet(model:model) }
-        .sheet(isPresented:$model.showGuide) { GuideView(model:model) }
+        .sheet(isPresented:$model.showCreate) { CreateSheet(model:model,inputs:model.createSources).presentingMessages(model) }
+        .sheet(isPresented:$model.showExtraction) { ExtractionSheet(model:model).presentingMessages(model) }
+        .sheet(isPresented:$model.showPassword,onDismiss:{model.dismissPassword()}) { PasswordSheet(model:model).presentingMessages(model) }
+        .sheet(isPresented:$model.showGuide) { GuideView(model:model).presentingMessages(model) }
+        .sheet(isPresented:Binding(get:{model.splitSource != nil},set:{if !$0 {model.splitSource=nil}})) {
+            if let source=model.splitSource {SplitSheet(model:model,source:source).presentingMessages(model)}
+        }
         .sheet(isPresented:Binding(get:{model.previewURL != nil},set:{if !$0 {model.dismissPreview()}})) {
-            if let url=model.previewURL { PreviewSheet(model:model,url:url) }
+            if let url=model.previewURL { PreviewSheet(model:model,url:url).presentingMessages(model) }
         }
-        .alert(item:$model.error) { item in
-            Alert(title:Text(item.title),message:Text(String(item.detail.prefix(3000))),dismissButton:.default(Text(model.t("action.ok"))))
-        }
+        .presentingMessages(model,enabled:!model.hasPresentedForm)
     }
 }
 @MainActor
@@ -82,7 +83,7 @@ struct SidebarView:View {
             }.padding(.top,16)
             VStack(spacing:5) {
                 navButton(.workspace,"nav.workspace","square.stack.3d.up")
-                navButton(.activity,"nav.activity","arrow.triangle.2.circlepath",count:model.activeJobs.count)
+                navButton(.activity,"nav.activity","arrow.triangle.2.circlepath",count:model.activeJobs.count+model.pendingFinderCount)
             }
             if !model.recents.isEmpty {
                 VStack(alignment:.leading,spacing:10) {
@@ -100,10 +101,6 @@ struct SidebarView:View {
             }
             Spacer()
             VStack(alignment:.leading,spacing:14) {
-                HStack(spacing:6) {
-                    Image(systemName:"lock.shield").font(.system(size:12))
-                    Text(model.t("privacy.local")).font(.system(size:10,weight:.medium))
-                }.foregroundStyle(.secondary)
                 Divider()
                 HStack {
                     SettingsLink {Label(model.t("nav.settings"),systemImage:"gearshape")}.buttonStyle(.plain).font(.system(size:12))
@@ -134,21 +131,12 @@ struct WelcomeView:View {
             Spacer(minLength:28)
             Image(systemName:"archivebox").font(.system(size:48,weight:.ultraLight)).foregroundStyle(Color.accentColor)
                 .frame(width:104,height:104).background(Color.accentColor.opacity(0.065),in:RoundedRectangle(cornerRadius:29))
-                .padding(.bottom,26)
-            Text(model.t("app.tagline")).font(.system(size:29,weight:.semibold,design:.rounded))
-            Text(model.t("welcome.subtitle")).font(.system(size:13)).foregroundStyle(.secondary).multilineTextAlignment(.center)
-                .lineSpacing(5).padding(.top,12)
+                .padding(.bottom,12)
             HStack(spacing:10) {
                 Button {model.chooseArchive()} label:{Label(model.t("action.open"),systemImage:"folder")}.buttonStyle(.borderedProminent)
                 Button {model.presentCreate()} label:{Label(model.t("action.new"),systemImage:"plus")}.buttonStyle(.bordered)
-            }.controlSize(.large).padding(.top,28)
+            }.controlSize(.large).padding(.top,16)
             Text(model.t("welcome.drag")).font(.system(size:11)).foregroundStyle(.tertiary).padding(.top,16)
-            HStack(spacing:9) {
-                ForEach(["7Z","ZIP","RAR","TAR","ISO","+"],id:\.self) { format in
-                    Text(format).font(.system(size:9,weight:.medium,design:.monospaced)).foregroundStyle(.secondary)
-                        .padding(.horizontal,9).padding(.vertical,5).background(.quaternary.opacity(0.45),in:RoundedRectangle(cornerRadius:5))
-                }
-            }.padding(.top,35)
             Spacer(minLength:40)
             if model.engines.sevenZip==nil {
                 HStack(spacing:8) {
@@ -156,12 +144,6 @@ struct WelcomeView:View {
                     Text(model.t("engine.missing")).font(.system(size:11))
                     Button(model.t("action.guide")){model.showGuide=true}
                 }.foregroundStyle(.orange).padding(14).frame(maxWidth:.infinity).background(.quaternary.opacity(0.3))
-            } else {
-                HStack(spacing:18) {
-                    Label(model.t("welcome.native"),systemImage:"cpu")
-                    Label(model.t("welcome.offline"),systemImage:"wifi.slash")
-                    Label(model.t("welcome.noAds"),systemImage:"sparkle")
-                }.font(.system(size:10)).foregroundStyle(.tertiary).padding(.bottom,24)
             }
         }.frame(maxWidth:.infinity,maxHeight:.infinity)
     }
@@ -184,12 +166,6 @@ struct ArchiveBrowser:View {
     var body:some View {
         VStack(spacing:0) {
             header
-            if model.metadataOnlyCount>0 {
-                Label(model.t("browser.metadataOnly"),systemImage:"info.circle")
-                    .font(.system(size:11)).foregroundStyle(.secondary)
-                    .frame(maxWidth:.infinity,alignment:.leading)
-                    .padding(.horizontal,23).padding(.bottom,14)
-            }
             Divider()
             HStack(spacing:7) {
                 Button {model.currentFolder="";model.search="";model.selection=[]} label:{Image(systemName:"house")}.buttonStyle(.plain)
@@ -210,9 +186,8 @@ struct ArchiveBrowser:View {
                     HStack(spacing:9) {
                         Image(systemName:row.icon).foregroundStyle(row.isDirectory ? Color.accentColor : Color.secondary).frame(width:17)
                         Text(row.name).lineLimit(1).truncationMode(.middle)
-                        if row.isMetadataOnly { Text(model.t("browser.infoOnly")).font(.caption).foregroundStyle(.secondary).help(model.t("browser.metadataOnly")) }
                         if row.isEncrypted {Image(systemName:"lock.fill").font(.system(size:8)).foregroundStyle(.secondary)}
-                    }.padding(.vertical,4)
+                    }.padding(.vertical,4).help(row.isMetadataOnly ? model.t("browser.metadataOnly") : row.path)
                 }.width(min:220,ideal:330)
                 TableColumn(model.t("table.size"),value:\.size) {row in Text(row.sizeText).monospacedDigit().foregroundStyle(.secondary)}.width(min:70,ideal:90,max:115)
                 TableColumn(model.t("table.packed"),value:\.packedSize) {row in
@@ -222,7 +197,12 @@ struct ArchiveBrowser:View {
                     if row.modified == .distantPast {Text("—").foregroundStyle(.tertiary)} else {Text(row.modified,style:.date).foregroundStyle(.secondary)}
                 }.width(min:105,ideal:125,max:150)
             }
-            .tableStyle(.inset(alternatesRowBackgrounds:true))
+            .tableStyle(.inset(alternatesRowBackgrounds:false))
+            .accessibilityIdentifier("archiveTable")
+            .onKeyPress(.space,phases:.down) {press in
+                guard press.modifiers.isEmpty,model.canQuickLook else {return .ignored}
+                model.quickLookSelection();return .handled
+            }
             .contextMenu(forSelectionType:String.self) { items in
                 Button(model.t("action.extractSelected")){model.presentExtract(selected:items)}.disabled(items.isEmpty)
                 if items.count==1,let first=items.first,let row=model.rows.first(where:{$0.path==first}) {
@@ -240,8 +220,10 @@ struct ArchiveBrowser:View {
                 Text("\(model.rows.count) "+model.t("browser.items"))
                 if !model.selection.isEmpty {Text("\(model.selection.count) "+model.t("browser.selected"))}
                 Spacer()
-                if model.isPreviewing {ProgressView().controlSize(.mini);Text(model.t("preview.preparing"))}
-                if let manifest=model.manifest {Text(manifest.backend == .sevenZip ? "7-Zip" : "libarchive").font(.system(size:10,design:.monospaced))}
+                if model.isPreviewing {
+                    ProgressView().controlSize(.mini);Text(model.t("preview.preparing"))
+                    Button {model.quickLookSelection()} label:{Image(systemName:"xmark")}.buttonStyle(.plain).help(model.t("action.cancel"))
+                }
             }.font(.system(size:10)).foregroundStyle(.secondary).padding(.horizontal,23).padding(.vertical,11)
         }
     }
@@ -261,11 +243,19 @@ struct ArchiveBrowser:View {
                 }.font(.system(size:11)).foregroundStyle(.secondary)
             }
             Spacer()
+            Button {model.quickLookSelection()} label:{Image(systemName:"eye")}
+                .buttonStyle(.plain).disabled(!model.canQuickLook).help(model.t("preview.shortcut")).accessibilityLabel(model.t("action.preview"))
+            Menu {
+                Button(model.t("action.reveal")) {
+                    if let source=model.manifest?.source {NSWorkspace.shared.activateFileViewerSelecting([source])}
+                }
+                Button(model.t("action.split")) {model.requestSplit()}
+            } label:{Image(systemName:"ellipsis.circle")}
+                .menuStyle(.borderlessButton).fixedSize().accessibilityLabel(model.t("menu.archive")).accessibilityIdentifier("archiveActions")
             if !model.selection.isEmpty {
                 Button(model.t("action.extractSelected")){model.presentExtract(selected:model.selection)}.buttonStyle(.bordered)
             }
-            Button {if let source=model.manifest?.source {NSWorkspace.shared.activateFileViewerSelecting([source])}} label:{Image(systemName:"arrow.up.right.square")}.buttonStyle(.plain).help(model.t("action.reveal"))
-        }.padding(24)
+        }.padding(20)
     }
     private var breadcrumbs:[Crumb] {
         var parts=[String]();return model.currentFolder.split(separator:"/").map{part in parts.append(String(part));return Crumb(path:parts.joined(separator:"/"),name:String(part))}
@@ -312,8 +302,8 @@ struct JobCard:View {
                 VStack(alignment:.leading,spacing:5) {
                     Text(job.title).font(.system(size:13,weight:.semibold)).lineLimit(1).truncationMode(.middle)
                     HStack(spacing:7) {
-                        Text(model.t(job.kind)); Text("·"); Text(model.t("state."+job.state.rawValue))
-                        if !job.state.terminal {Text("·");Text(model.t(job.progress.phase))}
+                        Text(model.t(job.kind)); Text("·")
+                        Text(model.t(job.state == .running ? job.progress.phase : "state."+job.state.rawValue))
                     }.font(.system(size:10)).foregroundStyle(.secondary)
                 }
                 Spacer()
@@ -340,7 +330,12 @@ struct JobCard:View {
                     Spacer()
                     if let start=job.started {
                         TimelineView(.periodic(from:.now,by:1)) { context in
-                            Text(Self.duration(max(0,context.date.timeIntervalSince(start)-job.control.pausedDuration))).monospacedDigit()
+                            HStack(spacing:12) {
+                                if let remaining=estimatedRemaining(at:context.date) {
+                                    Text(model.t("activity.remaining")+" "+Self.duration(remaining)).help(model.t("activity.remainingHint"))
+                                }
+                                Text(Self.duration(max(0,context.date.timeIntervalSince(start)-job.control.pausedDuration))).monospacedDigit()
+                            }
                         }
                     }
                     if let value=job.progress.fraction {Text("\(Int(value*100))%").monospacedDigit().frame(width:35,alignment:.trailing)}
@@ -348,7 +343,11 @@ struct JobCard:View {
             }
             if let key=job.errorKey {
                 DisclosureGroup(model.t(key)) {
-                    Text(job.errorDetail ?? "").font(.system(size:10,design:.monospaced)).textSelection(.enabled).frame(maxWidth:.infinity,alignment:.leading).padding(.top,6)
+                    ReadOnlyText(text:job.errorDetail ?? "").frame(height:180).padding(.top,6)
+                    Button(model.t("action.copyDetails")) {
+                        NSPasteboard.general.clearContents()
+                        NSPasteboard.general.setString(job.errorDetail ?? "",forType:.string)
+                    }.font(.system(size:10))
                 }.font(.system(size:11)).foregroundStyle(.secondary)
             }
             if job.state == .interrupted {Text(model.t("activity.interrupted")).font(.system(size:11)).foregroundStyle(.secondary)}
@@ -357,6 +356,13 @@ struct JobCard:View {
             .overlay(RoundedRectangle(cornerRadius:13).strokeBorder(Color(nsColor:.separatorColor).opacity(0.35),lineWidth:0.5))
     }
     private var stateColor:Color {job.state == .succeeded ? .green : job.state == .failed ? .orange : .accentColor}
+    private func estimatedRemaining(at date:Date)->TimeInterval? {
+        guard let started=job.phaseStarted,let fraction=job.progress.fraction,fraction>=0.02,fraction<1 else {return nil}
+        let elapsed=date.timeIntervalSince(started)-(job.control.pausedDuration-job.phasePauseSeconds)
+        guard elapsed>=3 else {return nil}
+        let remaining=elapsed*(1-fraction)/fraction
+        return remaining.isFinite ? max(0,remaining) : nil
+    }
     private var stateIcon:String {job.state == .succeeded ? "checkmark.circle" : job.state == .failed ? "exclamationmark.circle" : job.kind=="job.create" ? "archivebox" : "arrow.down.doc"}
     private func iconButton(_ icon:String,label:String,action:@escaping()->Void)->some View {Button(action:action){Image(systemName:icon).frame(width:23,height:23)}.buttonStyle(.borderless).help(model.t(label)).accessibilityLabel(model.t(label))}
     private static func duration(_ seconds:TimeInterval)->String {let s=Int(seconds);return s>=3600 ? String(format:"%d:%02d:%02d",s/3600,(s/60)%60,s%60) : String(format:"%d:%02d",s/60,s%60)}
@@ -376,7 +382,9 @@ struct PreviewSheet:View {
             HStack {Text(url.lastPathComponent).font(.headline);Spacer();Button(model.t("action.close")){model.dismissPreview()}.keyboardShortcut(.cancelAction)}.padding(18)
             Divider()
             QuickLookContent(url:url).frame(minWidth:720,minHeight:500)
-            HStack {Label(model.t("preview.private"),systemImage:"lock");Spacer()}.font(.system(size:10)).foregroundStyle(.secondary).padding(14)
+        }.onKeyPress(.space,phases:.down) {press in
+            guard press.modifiers.isEmpty else {return .ignored}
+            model.dismissPreview();return .handled
         }
     }
 }

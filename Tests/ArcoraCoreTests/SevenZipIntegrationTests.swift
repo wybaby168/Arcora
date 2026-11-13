@@ -61,11 +61,51 @@ final class SevenZipIntegrationTests:ArcoraTestCase {
             XCTAssertThrowsError(try service.inspect(parts.last!))
         }
     }
+    func testExistingZIPCanBeSplitAndExtractedDirectly()throws {
+        let service=try service(),file=try touch("original.bin")
+        let data=Data((0..<170_000).map{UInt8(truncatingIfNeeded:$0)})
+        try data.write(to:file)
+        var option=options(.zip);option.level=0
+        let archive=try service.create(inputs:[file],in:temp,name:"existing",options:option).outputs[0]
+        let original=try Data(contentsOf:archive)
+        let result=try service.split(archive,to:temp,partBytes:65_536)
+        let first=result.outputs[0].appendingPathComponent("existing.zip.001")
+        let restored=try service.extract(first,to:temp,name:"direct-restored").outputs[0]
+        XCTAssertEqual(try Data(contentsOf:restored.appendingPathComponent("original.bin")),data)
+        XCTAssertEqual(try Data(contentsOf:archive),original)
+    }
     func testOfficial7zReadsRealRAR5Fixtures()throws {
         let service=try service()
         for file in ["rar5-stored.rar","rar5-compressed.rar"] {
             let m=try service.inspect(fixture(file));XCTAssertEqual(m.backend,.sevenZip)
             _=try service.extract(fixture(file),to:temp,name:file+"-out")
+        }
+    }
+    func testIncompleteRARNamesMissingNextVolumeBeforeWriting()throws {
+        let source=temp.appendingPathComponent("rar5-multipart.part01.rar")
+        try FileManager.default.copyItem(at:fixture(source.lastPathComponent),to:source)
+        let service=try service()
+        XCTAssertThrowsError(try service.inspect(source)) {
+            XCTAssertEqual($0 as? ArchiveError,.missingVolume("rar5-multipart.part02.rar"))
+        }
+        XCTAssertThrowsError(try service.extract(source,to:temp,name:"Incomplete"))
+        XCTAssertFalse(FileManager.default.fileExists(atPath:temp.appendingPathComponent("Incomplete").path))
+        XCTAssertFalse(try FileManager.default.contentsOfDirectory(atPath:temp.path).contains{$0.hasPrefix(".arcora-")})
+    }
+    func testCompleteRARVolumeSetAndMissingLastPart()throws {
+        let service=try service()
+        var parts=[URL]()
+        for index in 1...8 {
+            let name=String(format:"rar5-multipart.part%02d.rar",index)
+            let part=temp.appendingPathComponent(name)
+            try FileManager.default.copyItem(at:fixture(name),to:part)
+            parts.append(part)
+        }
+        XCTAssertEqual(try service.inspect(parts[3]).entries.count,2)
+        _=try service.test(parts[0])
+        try FileManager.default.removeItem(at:parts[7])
+        XCTAssertThrowsError(try service.inspect(parts[0])) {
+            XCTAssertEqual($0 as? ArchiveError,.missingVolume("rar5-multipart.part08.rar"))
         }
     }
     func testClassicRARAndEncryptedSolidRAR4Fixtures() throws {

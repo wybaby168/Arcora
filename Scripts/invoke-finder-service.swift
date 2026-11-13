@@ -25,10 +25,9 @@ guard board.writeObjects(urls) else {fputs("Could not prepare the private file-s
 guard NSPerformService(CommandLine.arguments[1],board) else {
     fputs("Service request was not accepted. Install the app in Applications, open it once and check Services settings.\n",stderr);exit(1)
 }
-print("Service accepted the selection. Approve macOS's Run Service prompt if shown.")
+print("Service accepted the file selection.")
 if let expected {
-    // NSRestricted may defer delivery until a native confirmation is accepted.
-    // Keep this test client's private pasteboard alive until the result appears.
+    // Retain the private selection while asynchronous application work completes.
     let deadline=Date().addingTimeInterval(120)
     while !FileManager.default.fileExists(atPath:expected.path),Date()<deadline {
         RunLoop.current.run(until:Date().addingTimeInterval(0.2))

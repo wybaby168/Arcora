@@ -67,16 +67,16 @@ public struct EngineLocations: Sendable {
 }
 
 public enum SevenZipArguments {
-    public static func list(_ file:URL) -> [String] { ["l","-slt","-ba","-sccUTF-8","--",file.path] }
-    public static func test(_ file:URL,threads:Int) -> [String] { ["t","-bsp1","-bso1","-bse1","-sccUTF-8","-mmt=\(threads)","--",file.path] }
+    public static func list(_ file:URL) -> [String] { ["l","-slt","-sccUTF-8","--",file.path] }
+    public static func test(_ file:URL,threads:Int) -> [String] { ["t","-bsp1","-bso1","-bse2","-sccUTF-8","-mmt=\(threads)","--",file.path] }
     public static func extract(_ file:URL,to:URL,threads:Int,selectionList:URL?=nil) -> [String] {
-        var result=["x","-y","-aos","-bsp1","-bso1","-bse1","-sccUTF-8","-scsUTF-8","-spd","-mmt=\(threads)","-o"+to.path]
+        var result=["x","-y","-aos","-bsp1","-bso1","-bse2","-sccUTF-8","-scsUTF-8","-spd","-mmt=\(threads)","-o"+to.path]
         if let list=selectionList { result += ["-ssc","-i@"+list.path] }
         result += ["--",file.path]
         return result
     }
     public static func create(_ output:URL,list:URL,options:CompressionOptions,password:Bool) -> [String] {
-        var result=["a","-t"+options.format.sevenZipType,"-mx=\(options.level)","-mmt=\(options.threads)","-bsp1","-bso1","-bse1","-sccUTF-8","-scsUTF-8","-spd"]
+        var result=["a","-t"+options.format.sevenZipType,"-mx=\(options.level)","-mmt=\(options.threads)","-bsp1","-bso1","-bse2","-sccUTF-8","-scsUTF-8","-spd"]
         if options.format == .sevenZip {
             if options.level == 0 { result += ["-m0=Copy", "-ms=off"] }
             else { result += ["-m0=LZMA2","-md=\(options.dictionaryMiB)m",options.solid ? "-ms=on" : "-ms=off"] }
@@ -108,8 +108,9 @@ public enum RARArguments {
 }
 
 public enum SLTParser {
-    public static func parse(_ text:String,limit:Int=250000) throws -> [ArchiveEntry] {
+    public static func parse(_ text:String,limit:Int=250000,includesArchiveHeaders:Bool=false) throws -> [ArchiveEntry] {
         var result=[ArchiveEntry](),record=[String:String]()
+        var readingEntries = !includesArchiveHeaders
         let date=DateFormatter(); date.locale=Locale(identifier:"en_US_POSIX"); date.dateFormat="yyyy-MM-dd HH:mm:ss"
         func flush() throws {
             defer { record.removeAll(keepingCapacity:true) }
@@ -134,6 +135,10 @@ public enum SLTParser {
         }
         for raw in text.components(separatedBy:"\n") {
             let line=raw.hasSuffix("\r") ? String(raw.dropLast()) : raw
+            if !readingEntries {
+                if line=="----------" {readingEntries=true}
+                continue
+            }
             if line.isEmpty { try flush(); continue }
             if line.hasPrefix("----------") || line=="--" { try flush(); continue }
             guard let divider=line.range(of:" = ") else {
@@ -145,6 +150,7 @@ public enum SLTParser {
             if record[key] != nil { throw ArchiveError.unsafePath("Duplicate fields in archive metadata.") }
             record[key]=value
         }
+        guard readingEntries else {throw ArchiveError.invalid("The archive listing has no entry section.")}
         try flush()
         return result
     }

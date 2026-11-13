@@ -41,6 +41,7 @@ private struct ArchiveCommands:Commands {
             CommandMenu(model.t("menu.archive")) {
                 Button(model.t("action.extract")){ model.presentExtract() }.keyboardShortcut("e").disabled(model.manifest==nil)
                 Button(model.t("action.test")){ model.requestTest() }.keyboardShortcut("t").disabled(model.manifest==nil)
+                Button(model.t("action.split")){model.requestSplit()}.disabled(model.hasPresentedDialog)
                 Divider()
                 Button(model.t("action.closeArchive")){ model.closeArchive() }.disabled(model.manifest==nil)
             }

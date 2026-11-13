@@ -1,14 +1,20 @@
-# Finder quick compression
+# Finder actions
 
-Arcora 1.3 adds four native macOS file services. They work with files and folders selected in Finder; no Finder Sync extension, administrator helper or shell plug-in is installed.
+Arcora provides six native macOS file services for compression and extraction. Select files or folders in Finder, then choose the relevant action from Services.
 
 ## Use
 
 1. Move the built application into `/Applications` or your own `Applications` folder, and open it once.
 2. Select one or more files or folders in Finder and right-click.
-3. In **Services**, choose **Arcora — Quick ZIP**, **Quick 7z**, **Quick RAR** or **Custom Compression…**. macOS controls whether eligible services appear in a submenu or elsewhere in the context menu.
+3. In **Services**, choose **Arcora — Quick ZIP**, **Quick 7z**, **Quick RAR**, **Custom Compression…**, **Extract Archive** or **Extract to Folder…**. macOS controls menu placement.
 
-Quick compression needs no settings sheet in the ordinary case. macOS can show a **Run Service** confirmation before handing over selected files; approve it to continue. Arcora retains this protection and does not bypass it. It produces one unencrypted archive in the selected items' folder, keeps the originals, verifies the archive and reveals the committed result in Finder. The Activity page provides progress and cancellation. Existing output is never overwritten: name collisions receive a numbered alternative.
+**Extract Archive** creates a new folder beside each selected archive. **Extract to Folder…** opens a destination picker. Selecting several parts of the same archive schedules one extraction. Encrypted archives may request a password through the task's Retry action.
+
+Matching requests are coalesced while a form is open or the same request is waiting. Distinct requests retain their file selection and wait for the active form to close. A waiting count appears in the compression form.
+
+Open an existing archive and choose **Archive → Split Archive…** to divide its original bytes into numbered parts. The default part size is 2 GiB. Creating a new compressed archive also exposes its part-size control in the main form.
+
+Quick compression creates one unencrypted archive in the selected items' folder, verifies the archive and reveals the committed result in Finder. The Activity page provides progress and cancellation. Name collisions receive a numbered output name.
 
 Single-file output uses the file's base name; a directory keeps its full name, including dots. Multiple sibling items use their containing folder's name. When a selected folder already contains another selected item, that item is included only once. If selections span different locations or the containing folder is not writable, a folder picker asks where to save. Cancelling that picker creates nothing. Selecting links or unsupported special files fails safely.
 
@@ -23,7 +29,7 @@ Quick output has **no password**. Choose custom compression before sharing sensi
 ## Missing menu items
 
 - Keep one installed copy of the app in Applications and open it after installing an update.
-- In Arcora, use **Settings → General → Finder quick compression → Refresh Finder services**. This calls Apple's supported `NSUpdateDynamicServices()` API.
+- In Arcora, use **Settings → General → Finder actions → Refresh Finder services**. This calls Apple's supported `NSUpdateDynamicServices()` API.
 - Check **System Settings → Keyboard → Keyboard Shortcuts → Services → Files and Folders** and enable the desired Arcora entries. Arcora does not override a user's disabled-service choices.
 - Services menu titles follow the app-resource language chosen by macOS, not necessarily Arcora's in-app language preference. English, Simplified Chinese and Japanese menu resources are provided. Reopen the application after changing its system language.
 - macOS security approval may still be required for a downloaded app. Developer ID signing and notarization remain separate release requirements; no Gatekeeper or quarantine bypass is installed.
@@ -32,7 +38,9 @@ The private RAR build and the standard build are different app identities. Priva
 
 ## Implementation and verification
 
-`FinderServicesProvider` snapshots the pasteboard on the main actor and queues requests until its handler is ready. The application delegate owns the model before registering the provider. File planning then runs off the main actor, and actual work enters the existing task queue. Each service declares `public.item` file input, an explicit context and `NSRestricted` so it is not available as an arbitrary-file-processing escape from another app's sandbox.
+`FinderServicesProvider` snapshots the pasteboard on the main actor and queues requests until its handler is ready. The application delegate owns the model before registering the provider. File planning then runs off the main actor, and actual work enters the existing task queue. Compression accepts files and folders through `public.item`. Extraction accepts regular file selections through `public.data`.
+
+The six fixed file actions declare `NSRestricted = false` to avoid macOS's extra restricted-service confirmation. The receiver validates local file URLs, bounds request counts and dispatches a fixed action enum. Services use a one-way protocol with no returned file contents. Output uses the archive service's resource limits, path checks and new-destination commits. [Apple's Services keys](https://developer.apple.com/library/archive/documentation/General/Reference/InfoPlistKeyReference/Articles/CocoaKeys.html)
 
 ```bash
 python3 Scripts/check-finder-services.py
