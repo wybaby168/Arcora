@@ -22,21 +22,24 @@ public enum PathSafety {
         return components.joined(separator:"/")
     }
     public static func validate(_ entries:[ArchiveEntry],limits:SafetyLimits) throws {
+        try validateListing(entries,limits:limits)
+        _=try expandedBytesForOutput(entries,limits:limits)
+    }
+    /// A catalog describes names. A link can appear as a leaf, never as a traversable directory.
+    static func validateListing(_ entries:[ArchiveEntry],limits:SafetyLimits) throws {
         guard entries.count<=limits.maxEntries else { throw ArchiveError.resourceLimit("Too many archive entries.") }
-        var paths=[String:Bool](), total:UInt64=0
+        var paths=[String:Bool]()
         for item in entries {
             let path=try canonicalEntry(item.path)
-            if path=="." && item.isDirectory { continue }
-            guard path != ".", !item.isUnsafeType, item.linkTarget==nil else { throw ArchiveError.unsafePath(item.path) }
+            let directory=item.isDirectory && !item.isMetadataOnly
+            if path=="." && directory { continue }
+            guard path != "." else { throw ArchiveError.unsafePath(item.path) }
             // Conservatively avoid names that collide on a normal case-insensitive APFS volume.
             let key=path.precomposedStringWithCanonicalMapping.lowercased()
             if let oldDirectory=paths[key] {
-                guard oldDirectory && item.isDirectory else { throw ArchiveError.collision(item.path) }
+                guard oldDirectory && directory else { throw ArchiveError.collision(item.path) }
             }
-            paths[key]=item.isDirectory
-            let sum=total.addingReportingOverflow(item.size)
-            guard !sum.overflow,sum.partialValue<=limits.maxExpandedBytes else { throw ArchiveError.resourceLimit("Expanded size limit exceeded.") }
-            total=sum.partialValue
+            paths[key]=directory
         }
         // Reject file-vs-directory parent conflicts, regardless of archive entry order.
         for key in paths.keys {
@@ -45,6 +48,26 @@ public enum PathSafety {
                 parts.removeLast()
                 if paths[parts.joined(separator:"/")]==false { throw ArchiveError.collision(key) }
             }
+        }
+    }
+    static func expandedBytesForOutput(_ entries:[ArchiveEntry],limits:SafetyLimits) throws -> UInt64 {
+        var total:UInt64=0
+        for item in entries {
+            if item.isMetadataOnly { throw ArchiveError.metadataOnly(item.path) }
+            let sum=total.addingReportingOverflow(item.size)
+            guard !sum.overflow,sum.partialValue<=limits.maxExpandedBytes else { throw ArchiveError.resourceLimit("Expanded size limit exceeded.") }
+            total=sum.partialValue
+        }
+        return total
+    }
+    /// The caller supplies canonical paths. Implicit directory selections include their descendants.
+    static func isSelected(_ path:String,by selection:Set<String>) -> Bool {
+        if selection.contains(".") { return true }
+        var candidate=path[...]
+        while true {
+            if selection.contains(String(candidate)) { return true }
+            guard let slash=candidate.lastIndex(of:"/") else { return false }
+            candidate=candidate[..<slash]
         }
     }
     public static func safeFilename(_ name:String) throws {
@@ -107,8 +130,20 @@ public enum PathSafety {
         if path.unicodeScalars.contains(where:{$0.value<32 || $0.value==127}) { throw ArchiveError.unsafePath(path) }
     }
     @discardableResult
-    public static func auditOutput(_ root:URL,limits:SafetyLimits,quarantineSource:URL?=nil,control:JobControl?=nil) throws -> (Int,UInt64) {
+    public static func auditOutput(_ root:URL,limits:SafetyLimits,quarantineSource:URL?=nil,control:JobControl?=nil,expected:[ArchiveEntry]?=nil) throws -> (Int,UInt64) {
         let fm=FileManager.default
+        var allowed=[String:Bool]()
+        if let expected {
+            for entry in expected {
+                let path=entry.path.precomposedStringWithCanonicalMapping
+                allowed[path]=entry.isDirectory
+                var parent=path[...]
+                while let slash=parent.lastIndex(of:"/") {
+                    parent=parent[..<slash]
+                    if allowed.updateValue(true,forKey:String(parent)) != nil { break }
+                }
+            }
+        }
         var count=0,bytes:UInt64=0,walkError:Error?
         let keys:Set<URLResourceKey>=[.isSymbolicLinkKey,.isDirectoryKey,.isRegularFileKey,.fileSizeKey]
         guard let iterator=fm.enumerator(at:root,includingPropertiesForKeys:Array(keys),errorHandler:{_,e in walkError=e; return false}) else {
@@ -116,11 +151,12 @@ public enum PathSafety {
         }
         for case let file as URL in iterator {
             count+=1
-            _=try canonicalEntry(String(file.path.dropFirst(root.path.count+1)))
+            let path=try canonicalEntry(String(file.path.dropFirst(root.path.count+1)))
             if count%128==0 { try control?.waitWhilePaused() }
             guard count<=limits.maxEntries else { throw ArchiveError.resourceLimit("Too many extracted files.") }
             let v=try file.resourceValues(forKeys:keys)
             if v.isSymbolicLink==true || !(v.isDirectory==true || v.isRegularFile==true) { throw ArchiveError.unsafePath(file.path) }
+            if expected != nil,allowed[path.precomposedStringWithCanonicalMapping] != (v.isDirectory == true) { throw ArchiveError.io("Unexpected output outside the selection: "+path) }
             if v.isRegularFile==true {
                 let attributes=try fm.attributesOfItem(atPath:file.path)
                 if (attributes[.referenceCount] as? NSNumber)?.intValue ?? 1 > 1 { throw ArchiveError.unsafePath("Hard link: "+file.path) }

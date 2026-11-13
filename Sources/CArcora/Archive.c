@@ -105,7 +105,8 @@ int arc_archive_list(const char *source, const char *password, uint64_t max_entr
         const char *path=archive_entry_pathname_utf8(e);
         if (!path) path=archive_entry_pathname(e);
         if (!path) { result=fail(err,n,"Unrepresentable archive filename"); break; }
-        arc_entry item={path,archive_entry_symlink(e),archive_entry_size(e),
+        const char *link=archive_entry_symlink(e);
+        arc_entry item={path,link ? link : archive_entry_hardlink(e),archive_entry_size(e),
             archive_entry_mtime(e),archive_entry_filetype(e)==AE_IFDIR,
             archive_entry_is_encrypted(e)>0,unsafe_entry(e)};
         if (callback && callback(&item,ctx)) { result=fail(err,n,"Cancelled"); break; }
@@ -168,19 +169,21 @@ int arc_archive_read(const char *source,const char *password,const char *destina
         if (++count>max_entries) { result=fail(err,n,"Entry limit exceeded"); break; }
         const char *path=archive_entry_pathname_utf8(e);
         if (!path) path=archive_entry_pathname(e);
-        if (!arc_safe_relative_path(path) || unsafe_entry(e)) {
-            result=fail(err,n,"Unsafe archive path or unsupported link/special file"); break;
+        if (!arc_safe_relative_path(path)) {
+            result=fail(err,n,"Unsafe archive path"); break;
         }
-        // A root directory entry '.' is metadata, not an output file.
-        if (archive_entry_filetype(e)==AE_IFDIR && (!strcmp(path,".") || !strcmp(path,"./"))) continue;
         if (filter) {
-            arc_entry item={path,NULL,archive_entry_size(e),archive_entry_mtime(e),archive_entry_filetype(e)==AE_IFDIR,archive_entry_is_encrypted(e)>0,0};
+            const char *link=archive_entry_symlink(e);
+            arc_entry item={path,link ? link : archive_entry_hardlink(e),archive_entry_size(e),archive_entry_mtime(e),archive_entry_filetype(e)==AE_IFDIR,archive_entry_is_encrypted(e)>0,unsafe_entry(e)};
             if (!filter(&item,ctx)) {
                 status=archive_read_data_skip(a);
                 if (status<ARCHIVE_OK) { result=fail(err,n,archive_error_string(a)); break; }
                 continue;
             }
         }
+        if (unsafe_entry(e)) { result=fail(err,n,"Unsupported link/special file"); break; }
+        // A root directory entry '.' is metadata, not an output file.
+        if (archive_entry_filetype(e)==AE_IFDIR && (!strcmp(path,".") || !strcmp(path,"./"))) continue;
         int output=-1,parent=-1;
         char *leaf=NULL;
         if (!test_only) {

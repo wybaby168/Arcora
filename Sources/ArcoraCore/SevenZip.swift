@@ -71,7 +71,7 @@ public enum SevenZipArguments {
     public static func test(_ file:URL,threads:Int) -> [String] { ["t","-bsp1","-bso1","-bse1","-sccUTF-8","-mmt=\(threads)","--",file.path] }
     public static func extract(_ file:URL,to:URL,threads:Int,selectionList:URL?=nil) -> [String] {
         var result=["x","-y","-aos","-bsp1","-bso1","-bse1","-sccUTF-8","-scsUTF-8","-spd","-mmt=\(threads)","-o"+to.path]
-        if let list=selectionList { result += ["-i@"+list.path] }
+        if let list=selectionList { result += ["-ssc","-i@"+list.path] }
         result += ["--",file.path]
         return result
     }
@@ -117,17 +117,20 @@ public enum SLTParser {
             if record["Type"] != nil && record["Size"]==nil && record["Folder"]==nil { return }
             guard result.count<limit else { throw ArchiveError.resourceLimit("Too many archive entries.") }
             let attributes=record["Attributes"] ?? ""
-            let unix=record["Mode"] ?? record["Characteristics"] ?? ""
+            // ZIP keeps the POSIX mode in Attributes. TAR and other handlers may expose Mode separately.
+            let modeFields=[record["Mode"],record["Attributes"],record["Characteristics"]]
+            let unixType=modeFields.compactMap{$0}.lazy.flatMap{$0.split(separator:" ")}.first{ token in
+                token.count==10 && token.dropFirst().allSatisfy{"rwxstST-".contains($0)}
+            }?.first
             let link=[record["Symbolic Link"],record["Hard Link"]].compactMap{$0}.first{!$0.isEmpty}
-            let isLink=link != nil || unix.hasPrefix("l") || attributes.contains(" lrwx") || attributes.hasPrefix("lrwx")
-            let isSpecial=unix.hasPrefix("b") || unix.hasPrefix("c") || unix.hasPrefix("p") || unix.hasPrefix("s")
+            let metadataOnly=link != nil || unixType.map{"lbcps".contains($0)} == true
             let rawSize=record["Size"] ?? "0"
             guard let size=UInt64(rawSize.isEmpty ? "0" : rawSize) else { throw ArchiveError.invalid("Invalid size in archive listing.") }
             let normalized=try PathSafety.canonicalEntry(path)
             result.append(ArchiveEntry(path:normalized,size:size,packedSize:record["Packed Size"].flatMap(UInt64.init),
                 modified:record["Modified"].flatMap{date.date(from:String($0.prefix(19)))},
-                isDirectory:record["Folder"]=="+" || attributes.first=="D" || unix.hasPrefix("d"),
-                isEncrypted:record["Encrypted"]=="+",isUnsafeType:isLink || isSpecial,linkTarget:link))
+                isDirectory:!metadataOnly && (record["Folder"]=="+" || attributes.first=="D" || unixType=="d"),
+                isEncrypted:record["Encrypted"]=="+",isUnsafeType:metadataOnly,linkTarget:link))
         }
         for raw in text.components(separatedBy:"\n") {
             let line=raw.hasSuffix("\r") ? String(raw.dropLast()) : raw

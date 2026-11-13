@@ -184,6 +184,12 @@ struct ArchiveBrowser:View {
     var body:some View {
         VStack(spacing:0) {
             header
+            if model.metadataOnlyCount>0 {
+                Label(model.t("browser.metadataOnly"),systemImage:"info.circle")
+                    .font(.system(size:11)).foregroundStyle(.secondary)
+                    .frame(maxWidth:.infinity,alignment:.leading)
+                    .padding(.horizontal,23).padding(.bottom,14)
+            }
             Divider()
             HStack(spacing:7) {
                 Button {model.currentFolder="";model.search="";model.selection=[]} label:{Image(systemName:"house")}.buttonStyle(.plain)
@@ -204,6 +210,7 @@ struct ArchiveBrowser:View {
                     HStack(spacing:9) {
                         Image(systemName:row.icon).foregroundStyle(row.isDirectory ? Color.accentColor : Color.secondary).frame(width:17)
                         Text(row.name).lineLimit(1).truncationMode(.middle)
+                        if row.isMetadataOnly { Text(model.t("browser.infoOnly")).font(.caption).foregroundStyle(.secondary).help(model.t("browser.metadataOnly")) }
                         if row.isEncrypted {Image(systemName:"lock.fill").font(.system(size:8)).foregroundStyle(.secondary)}
                     }.padding(.vertical,4)
                 }.width(min:220,ideal:330)
@@ -219,7 +226,7 @@ struct ArchiveBrowser:View {
             .contextMenu(forSelectionType:String.self) { items in
                 Button(model.t("action.extractSelected")){model.presentExtract(selected:items)}.disabled(items.isEmpty)
                 if items.count==1,let first=items.first,let row=model.rows.first(where:{$0.path==first}) {
-                    Button(model.t(row.isDirectory ? "action.open" : "action.preview")){model.enter(row)}
+                    Button(model.t(row.openAction)){model.enter(row)}
                 }
                 Divider()
                 Button(model.t("action.copyPath")) {

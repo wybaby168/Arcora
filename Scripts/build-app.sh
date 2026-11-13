@@ -13,9 +13,12 @@ python3 Scripts/check-icon-assets.py
 [ -x Vendor/7zip/7zz ] || { echo 'Run Scripts/bootstrap-engines.sh first.' >&2; exit 1; }
 [ "$(cat Vendor/7zip/platform.txt)" = mac ] || { echo 'The cached engine is not a macOS binary. Bootstrap on this Mac first.' >&2; exit 1; }
 [ -f Vendor/UpstreamSource/7z2603-src.tar.xz ] || { echo 'Corresponding upstream source is required; run bootstrap-engines.sh.' >&2; exit 1; }
-xcrun lipo Vendor/7zip/7zz -verify_arch arm64 x86_64
-xcrun lipo Vendor/libarchive/lib/libarchive.a -verify_arch arm64 x86_64
-xcrun lipo Vendor/libarchive/lib/liblzma.a -verify_arch arm64 x86_64
+xcrun lipo Vendor/7zip/7zz -verify_arch arm64
+xcrun lipo Vendor/7zip/7zz -verify_arch x86_64
+xcrun lipo Vendor/libarchive/lib/libarchive.a -verify_arch arm64
+xcrun lipo Vendor/libarchive/lib/libarchive.a -verify_arch x86_64
+xcrun lipo Vendor/libarchive/lib/liblzma.a -verify_arch arm64
+xcrun lipo Vendor/libarchive/lib/liblzma.a -verify_arch x86_64
 if [ -n "${ARCORA_RAR_DISTRIBUTION_DIR:-}" ]; then
   echo 'This edition does not distribute the RAR encoder. Use the official browser download and local original-package import.' >&2; exit 1
 fi
@@ -76,7 +79,8 @@ else
 fi
 codesign --verify --deep --strict --verbose=2 "$TMP_APP"
 for FILE in "$TMP_APP/Contents/MacOS/Arcora" "$TMP_APP/Contents/Helpers/7zz" "$TMP_APP/Contents/Helpers/arcora-worker" "$TMP_APP/Contents/Helpers/arcora"; do
-  xcrun lipo "$FILE" -verify_arch arm64 x86_64
+  xcrun lipo "$FILE" -verify_arch arm64
+  xcrun lipo "$FILE" -verify_arch x86_64
   if otool -L "$FILE" | awk '/^[[:space:]]+/{print $1}' | grep -E '/opt/homebrew|/usr/local|/Users/|/private/tmp|/var/folders'; then
     echo "Nonportable runtime dependency in $FILE" >&2; exit 1
   fi

@@ -96,8 +96,11 @@ struct ArchiveRow:Identifiable,Sendable {
     var size:UInt64,packedSize:UInt64
     var modified:Date
     var isDirectory:Bool,isEncrypted:Bool
+    var isMetadataOnly=false
+    var linkTarget:String?
     var id:String { path }
-    var icon:String { isDirectory ? "folder" : "doc" }
+    var icon:String { isMetadataOnly ? "info.circle" : isDirectory ? "folder" : "doc" }
+    var openAction:String { isMetadataOnly ? "action.entryInfo" : isDirectory ? "action.open" : "action.preview" }
     var sizeText:String { isDirectory ? "—" : ByteCountFormatter.string(fromByteCount:Int64(clamping:size),countStyle:.file) }
 }
 
@@ -105,7 +108,13 @@ struct ArchiveRow:Identifiable,Sendable {
 final class AppModel:ObservableObject {
     @Published var preferences:Preferences { didSet { savePreferences() } }
     @Published var page:SectionPage = .workspace
-    @Published var manifest:ArchiveManifest? { didSet { rebuildRows() } }
+    @Published var manifest:ArchiveManifest? {
+        didSet {
+            metadataOnlyCount=manifest?.entries.filter{$0.isMetadataOnly}.count ?? 0
+            rebuildRows()
+        }
+    }
+    @Published private(set) var metadataOnlyCount=0
     @Published var isLoading=false
     @Published var currentFolder="" { didSet { rebuildRows() } }
     @Published var search="" { didSet { rebuildRows() } }
@@ -254,7 +263,8 @@ final class AppModel:ObservableObject {
             if !query.isEmpty {
                 guard entry.path.localizedStandardContains(query) else { continue }
                 map[entry.path]=ArchiveRow(path:entry.path,name:entry.path,size:entry.size,packedSize:entry.packedSize ?? 0,
-                                          modified:entry.modified ?? .distantPast,isDirectory:entry.isDirectory,isEncrypted:entry.isEncrypted)
+                                          modified:entry.modified ?? .distantPast,isDirectory:entry.isDirectory,isEncrypted:entry.isEncrypted,
+                                          isMetadataOnly:entry.isMetadataOnly,linkTarget:entry.linkTarget)
                 continue
             }
             guard entry.path.hasPrefix(prefix) else {continue}
@@ -265,7 +275,8 @@ final class AppModel:ObservableObject {
                 if map[path]==nil { map[path]=ArchiveRow(path:path,name:first,size:0,packedSize:0,modified:.distantPast,isDirectory:true,isEncrypted:false) }
             } else {
                 map[entry.path]=ArchiveRow(path:entry.path,name:rest,size:entry.size,packedSize:entry.packedSize ?? 0,
-                                          modified:entry.modified ?? .distantPast,isDirectory:entry.isDirectory,isEncrypted:entry.isEncrypted)
+                                          modified:entry.modified ?? .distantPast,isDirectory:entry.isDirectory,isEncrypted:entry.isEncrypted,
+                                          isMetadataOnly:entry.isMetadataOnly,linkTarget:entry.linkTarget)
             }
         }
         return Array(map.values)
@@ -277,6 +288,7 @@ final class AppModel:ObservableObject {
     }
     func open(_ source:URL,password:Secret?=nil) {
         inspectionControl?.cancel()
+        previewControl?.cancel()
         currentPassword?.clear(); currentPassword=password?.copy()
         let control=JobControl(); inspectionControl=control
         let service=self.service,secret=password?.copy()
@@ -303,6 +315,7 @@ final class AppModel:ObservableObject {
     }
     func closeArchive() {
         archiveRevision=UUID(); inspectionControl?.cancel(); isLoading=false
+        previewControl?.cancel()
         manifest=nil; currentFolder=""; search=""; selection=[]; currentPassword?.clear(); currentPassword=nil
     }
     func presentCreate(_ files:[URL]=[],format:ArchiveFormat = .sevenZip) {
@@ -366,8 +379,11 @@ final class AppModel:ObservableObject {
     func dismissPassword() { showPassword=false; passwordContinuation=nil }
     func presentExtract(selected:Set<String>?=nil) {
         guard let manifest,!hasPresentedDialog else{return}
+        let entries:[ArchiveEntry]
+        do { entries=try manifest.selectedEntries(selected) } catch { report(error);return }
+        if let entry=entries.first(where:{$0.isMetadataOnly}) { report(ArchiveError.metadataOnly(entry.path));return }
         extractionSelection=selected
-        if manifest.encrypted && currentPassword==nil {
+        if entries.contains(where:{$0.isEncrypted}) && currentPassword==nil {
             askPassword { [weak self] secret in self?.currentPassword=secret; self?.showExtraction=true }
         } else { showExtraction=true }
     }
@@ -462,26 +478,28 @@ final class AppModel:ObservableObject {
     }
     func clearHistory() { jobs.removeAll{$0.state.terminal};persistHistory() }
     func clearRecents() { recents=[];UserDefaults.standard.removeObject(forKey:"Arcora.recents") }
-    func enter(_ row:ArchiveRow) { if row.isDirectory {currentFolder=row.path;search="";selection=[]} else {preview(row)} }
+    func enter(_ row:ArchiveRow) {
+        if row.isMetadataOnly {
+            var detail=row.path
+            if let target=row.linkTarget { detail+="\n"+t("browser.linkTarget")+" "+target }
+            error=UIError(title:t("action.entryInfo"),detail:detail+"\n\n"+t("browser.metadataOnly"))
+        } else if row.isDirectory {currentFolder=row.path;search="";selection=[]}
+        else {preview(row)}
+    }
     func preview(_ row:ArchiveRow) {
-        guard let manifest,!row.isDirectory,!isPreviewing else{return}
-        guard row.size<=100*1_048_576 else {report(ArchiveError.resourceLimit(t("preview.limit")));return}
-        if manifest.encrypted && currentPassword==nil {askPassword{[weak self] secret in self?.currentPassword=secret;self?.preview(row)};return}
+        guard let manifest,!row.isDirectory,!row.isMetadataOnly,!isPreviewing else{return}
+        guard row.size<=ArchiveService.previewByteLimit else {report(ArchiveError.resourceLimit(t("preview.limit")));return}
+        if row.isEncrypted && currentPassword==nil {askPassword{[weak self] secret in self?.currentPassword=secret;self?.preview(row)};return}
         let service=self.service,secret=currentPassword?.copy(),parent=previews,control=JobControl(),source=manifest.source
-        let limit=limits.maxExpandedBytes
+        let revision=archiveRevision
         isPreviewing=true; previewControl=control
         Task {
             let result=await Task.detached(priority:.userInitiated) { ()->Result<URL,Error> in
                 defer{secret?.clear()}
-                return Result {
-                    let output=try service.extract(source,to:parent,name:UUID().uuidString,selection:[row.path],password:secret,control:control)
-                    guard let root=output.outputs.first else{throw ArchiveError.io("No preview output.")}
-                    let target=root.appendingPathComponent(row.path)
-                    guard (try target.resourceValues(forKeys:[.fileSizeKey]).fileSize ?? 0)<=min(Int(clamping:limit),100*1_048_576) else{throw ArchiveError.resourceLimit("Preview limit exceeded.")}
-                    return target
-                }
+                return Result {try service.preview(source,entry:row.path,in:parent,password:secret,control:control)}
             }.value
             self.isPreviewing=false; self.previewControl=nil
+            guard self.archiveRevision==revision else {self.dismissPreview();return}
             switch result {case .success(let url):self.previewURL=url;case .failure(let error): if (error as? ArchiveError) != .cancelled { self.report(error) }; self.dismissPreview()}
         }
     }
@@ -491,7 +509,12 @@ final class AppModel:ObservableObject {
         if let items=try? FileManager.default.contentsOfDirectory(at:previews,includingPropertiesForKeys:nil) { for item in items {try? FileManager.default.removeItem(at:item)} }
     }
     func prepareToQuit() { currentPassword?.clear(); rowsTask?.cancel(); dismissPreview(); try? FileManager.default.removeItem(at:previews) }
-    func report(_ e:Error) {error=UIError(title:t((e as? ArchiveError)?.localizationKey ?? "error.io"),detail:e.localizedDescription)}
+    func report(_ e:Error) {
+        let detail:String
+        if case .metadataOnly(let path)=e as? ArchiveError { detail=t("browser.metadataOnly")+"\n\n"+path }
+        else { detail=e.localizedDescription }
+        error=UIError(title:t((e as? ArchiveError)?.localizationKey ?? "error.io"),detail:detail)
+    }
     private func savePreferences() {
         if let data=try? JSONEncoder().encode(preferences) {UserDefaults.standard.set(data,forKey:"Arcora.preferences")}
     }

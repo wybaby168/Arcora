@@ -88,6 +88,11 @@
 "error.passwordRequired" = "需要输入密码。";
 "error.timeout" = "操作超时。";
 "error.unsafe" = "此压缩包包含危险或存在歧义的条目。";
+"error.metadataOnly" = "所选内容包含链接或特殊文件。";
+"action.entryInfo" = "查看条目信息";
+"browser.infoOnly" = "仅信息";
+"browser.linkTarget" = "归档中记录的链接目标";
+"browser.metadataOnly" = "链接和特殊文件仅供查看信息。请选择普通文件进行预览或解压。";
 "error.unsupported" = "不支持此格式或功能。";
 "error.volume" = "缺少压缩分卷。";
 "error.wrongPassword" = "密码错误，或加密数据已损坏。";
@@ -121,7 +126,7 @@
 "guide.password.title" = "保护压缩包";
 "guide.rar.body" = "RAR/RAR5 可直接浏览、校验和解压。创建 RAR 时，到设置 → 引擎打开对应 Mac 架构的官方下载链接，下载完成后选择原始 .tar.gz 一键导入，再导入自己购买的 rarreg.key。无需手工安装或配置命令行。注册确认后支持 RAR5、固实、加密和分卷；修复、REV、SFX 创建未提供。";
 "guide.rar.title" = "RAR 兼容性";
-"guide.safety.body" = "Arcora 在独立临时工作区处理文件，检查后提交到新位置。拒绝危险路径、链接、设备文件和冲突条目。这种保守模式不保留所有 Unix 元数据，也不能将压缩包解析视为完整的安全沙盒。";
+"guide.safety.body" = "浏览时会显示链接和特殊文件的信息，普通文件可单独预览、解压。解压时检查所选内容，拒绝写出链接和特殊文件，在独立临时工作区检查后提交到新位置。打开压缩包时会检查危险路径和冲突名称。完整 Unix 元数据还原和沙盒隔离需使用相应专用工具。";
 "guide.safety.title" = "新文件夹，不悄悄覆盖";
 "guide.start.body" = "拖入压缩包进行浏览，拖入文件或文件夹开始压缩。⌘O 打开，⌘N 新建。双击文件夹浏览，双击文件快速查看。";
 "guide.start.title" = "从一个文件开始";

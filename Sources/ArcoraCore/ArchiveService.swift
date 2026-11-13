@@ -32,7 +32,7 @@ public final class ArchiveService: @unchecked Sendable {
             throw error
         }
         let entries=try SLTParser.parse(result.output,limit:limits.maxEntries)
-        try PathSafety.validate(entries,limits:limits)
+        try PathSafety.validateListing(entries,limits:limits)
         return ArchiveManifest(source:source,backend:.sevenZip,entries:entries,format:source.pathExtension.uppercased())
     }
     private func inspectNative(_ source:URL,password:Secret?,control:JobControl) throws -> ArchiveManifest {
@@ -45,7 +45,7 @@ public final class ArchiveService: @unchecked Sendable {
             guard var item=message.entry else { return nil }
             item.path=try PathSafety.canonicalEntry(item.path); return item
         }
-        try PathSafety.validate(entries,limits:limits)
+        try PathSafety.validateListing(entries,limits:limits)
         return ArchiveManifest(source:source,backend:.libarchive,entries:entries,format:source.pathExtension.uppercased())
     }
     public func test(_ input:URL,password:Secret?=nil,threads:Int=4,control:JobControl=JobControl(),progress:ProgressSink?=nil) throws -> OperationResult {
@@ -55,6 +55,7 @@ public final class ArchiveService: @unchecked Sendable {
         return OperationResult(outputs:[],entries:manifest.entries.count,bytes:manifest.totalBytes)
     }
     private func testManifest(_ manifest:ArchiveManifest,password:Secret?,threads:Int,control:JobControl,progress:ProgressSink?) throws {
+        _=try PathSafety.expandedBytesForOutput(manifest.entries,limits:limits)
         progress?(ProgressEvent("phase.verifying"))
         if manifest.backend == .libarchive {
             try runProgress(workerCommand("test",source:manifest.source,password:password),phase:"phase.verifying",native:true,control:control,progress:progress)
@@ -67,25 +68,39 @@ public final class ArchiveService: @unchecked Sendable {
         let manifest=try inspect(input,password:password,control:control,progress:progress)
         let outputName=name ?? Self.defaultFolderName(manifest.source)
         try PathSafety.safeFilename(outputName)
-        let selected:[ArchiveEntry]
-        if let selection {
-            guard !selection.isEmpty else { throw ArchiveError.invalid("No entries selected.") }
-            for path in selection { _=try PathSafety.canonicalEntry(path) }
-            selected=manifest.entries.filter{ item in selection.contains{item.path==$0 || item.path.hasPrefix($0+"/")} }
-            guard !selected.isEmpty else { throw ArchiveError.invalid("Selection does not exist in this archive.") }
-        } else { selected=manifest.entries }
-        let expanded=selected.reduce(UInt64(0)){$0+$1.size}
+        let selected=try manifest.selectedEntries(selection)
+        return try write(manifest,entries:selected,filtered:selection != nil,to:parent,name:outputName,limits:limits,password:password,threads:threads,collision:collision,control:control,progress:progress)
+    }
+    public static let previewByteLimit:UInt64=100*1024*1024
+    public func preview(_ input:URL,entry path:String,in parent:URL,password:Secret?=nil,control:JobControl=JobControl()) throws -> URL {
+        let path=try PathSafety.canonicalEntry(path)
+        let manifest=try inspect(input,password:password,control:control)
+        guard let entry=manifest.entries.first(where:{$0.path==path}),!entry.isDirectory else {
+            throw ArchiveError.invalid("Select a file to preview.")
+        }
+        var previewLimits=limits
+        previewLimits.maxExpandedBytes=min(limits.maxExpandedBytes,Self.previewByteLimit)
+        let result=try write(manifest,entries:[entry],filtered:true,to:parent,name:UUID().uuidString,limits:previewLimits,password:password,threads:1,collision:.fail,control:control,progress:nil)
+        let root=result.outputs[0],target=root.appendingPathComponent(path)
+        do {
+            try FileManager.default.setAttributes([.posixPermissions:0o600],ofItemAtPath:target.path)
+            return target
+        } catch { try? FileManager.default.removeItem(at:root); throw error }
+    }
+    private func write(_ manifest:ArchiveManifest,entries selected:[ArchiveEntry],filtered:Bool,to parent:URL,name outputName:String,
+                       limits:SafetyLimits,password:Secret?,threads:Int,collision:CollisionPolicy,control:JobControl,progress:ProgressSink?) throws -> OperationResult {
+        let expanded=try PathSafety.expandedBytesForOutput(selected,limits:limits)
         try PathSafety.requireFreeSpace(at:parent,bytes:expanded)
         let area=try Workspace(parent:parent)
         let list:URL?
-        if selection != nil {
+        if filtered {
             let url=area.scratch.appendingPathComponent("selection.txt")
             try Data((selected.map{$0.path}.joined(separator:"\n")+"\n").utf8).write(to:url,options:.atomic)
             list=url
         } else { list=nil }
         let command:EngineCommand
         if manifest.backend == .libarchive {
-            command=try workerCommand("extract",source:manifest.source,destination:area.payload,password:password,selection:list)
+            command=try workerCommand("extract",source:manifest.source,destination:area.payload,password:password,selection:list,maxBytes:limits.maxExpandedBytes)
         } else {
             command=EngineCommand(try engines.require7z(),SevenZipArguments.extract(manifest.source,to:area.payload,threads:threads,selectionList:list),secret:password)
         }
@@ -103,12 +118,16 @@ public final class ArchiveService: @unchecked Sendable {
         if let failure=monitor.failure { throw failure }
         try control.waitWhilePaused()
         progress?(ProgressEvent("phase.checking"))
-        let (count,bytes)=try PathSafety.auditOutput(area.payload,limits:limits,quarantineSource:manifest.source,control:control)
+        let (count,bytes)=try PathSafety.auditOutput(area.payload,limits:limits,quarantineSource:manifest.source,control:control,expected:filtered ? selected : nil)
         // A changed source or incomplete extraction must not silently publish a success.
-        for item in selected where !item.isDirectory {
+        for item in selected {
             let target=area.payload.appendingPathComponent(item.path)
-            let values=try target.resourceValues(forKeys:[.isRegularFileKey,.fileSizeKey])
-            guard values.isRegularFile==true,UInt64(max(0,values.fileSize ?? 0))==item.size else { throw ArchiveError.io("An expected entry was not completely extracted: "+item.path) }
+            let values=try target.resourceValues(forKeys:[.isRegularFileKey,.isDirectoryKey,.fileSizeKey])
+            if item.isDirectory {
+                guard values.isDirectory==true else { throw ArchiveError.io("An expected directory was not extracted: "+item.path) }
+            } else {
+                guard values.isRegularFile==true,UInt64(max(0,values.fileSize ?? 0))==item.size else { throw ArchiveError.io("An expected entry was not completely extracted: "+item.path) }
+            }
         }
         try control.waitWhilePaused()
         progress?(ProgressEvent("phase.committing"))
@@ -197,6 +216,7 @@ public final class ArchiveService: @unchecked Sendable {
         }
         if let expected {
             let manifest=try inspect(first,password:password,control:control)
+            _=try PathSafety.expandedBytesForOutput(manifest.entries,limits:limits)
             let actual=Dictionary(manifest.entries.map{($0.path,$0)},uniquingKeysWith:{old,_ in old})
             guard expected.count==actual.count,expected.allSatisfy({item in
                 guard let value=actual[item.path] else {return false}
@@ -238,10 +258,10 @@ public final class ArchiveService: @unchecked Sendable {
         try PathSafety.validate(entries,limits:limits)
         return entries
     }
-    private func workerCommand(_ action:String,source:URL,destination:URL?=nil,password:Secret?,selection:URL?=nil) throws -> EngineCommand {
+    private func workerCommand(_ action:String,source:URL,destination:URL?=nil,password:Secret?,selection:URL?=nil,maxBytes:UInt64?=nil) throws -> EngineCommand {
         var args=[action,source.path]
         if let destination { args.append(destination.path) }
-        args += ["--max-bytes",String(limits.maxExpandedBytes),"--max-entries",String(limits.maxEntries)]
+        args += ["--max-bytes",String(maxBytes ?? limits.maxExpandedBytes),"--max-entries",String(limits.maxEntries)]
         if let selection { args += ["--selection",selection.path] }
         return EngineCommand(try engines.requireWorker(),args,secret:password,passwordCopies:1)
     }

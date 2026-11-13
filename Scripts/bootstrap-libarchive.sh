@@ -37,8 +37,10 @@ cp "$XZ_ASSET" Vendor/UpstreamSource/
 if [ -f Vendor/libarchive/version.txt ] && [ "$(cat Vendor/libarchive/version.txt)" = "$VERSION" ] &&
    [ -f Vendor/libarchive/include/archive.h ] && [ -f Vendor/libarchive/COPYING ] &&
    [ -f Vendor/libarchive/xz-version.txt ] && [ "$(cat Vendor/libarchive/xz-version.txt)" = "$XZ_VERSION" ] &&
-   xcrun lipo Vendor/libarchive/lib/liblzma.a -verify_arch arm64 x86_64 2>/dev/null &&
-   xcrun lipo Vendor/libarchive/lib/libarchive.a -verify_arch arm64 x86_64 2>/dev/null; then
+   xcrun lipo Vendor/libarchive/lib/liblzma.a -verify_arch arm64 2>/dev/null &&
+   xcrun lipo Vendor/libarchive/lib/liblzma.a -verify_arch x86_64 2>/dev/null &&
+   xcrun lipo Vendor/libarchive/lib/libarchive.a -verify_arch arm64 2>/dev/null &&
+   xcrun lipo Vendor/libarchive/lib/libarchive.a -verify_arch x86_64 2>/dev/null; then
   echo "libarchive $VERSION universal library is ready."
   exit 0
 fi
@@ -84,9 +86,11 @@ for ARCH in arm64 x86_64; do
   }
 done
 xcrun lipo -create "$BUILD/arm64/.libs/libarchive.a" "$BUILD/x86_64/.libs/libarchive.a" -output Vendor/libarchive/lib/libarchive.a
-xcrun lipo Vendor/libarchive/lib/libarchive.a -verify_arch arm64 x86_64
+xcrun lipo Vendor/libarchive/lib/libarchive.a -verify_arch arm64
+xcrun lipo Vendor/libarchive/lib/libarchive.a -verify_arch x86_64
 xcrun lipo -create "$BUILD/xz-arm64/lib/liblzma.a" "$BUILD/xz-x86_64/lib/liblzma.a" -output Vendor/libarchive/lib/liblzma.a
-xcrun lipo Vendor/libarchive/lib/liblzma.a -verify_arch arm64 x86_64
+xcrun lipo Vendor/libarchive/lib/liblzma.a -verify_arch arm64
+xcrun lipo Vendor/libarchive/lib/liblzma.a -verify_arch x86_64
 cp "$SOURCE/libarchive/archive.h" "$SOURCE/libarchive/archive_entry.h" Vendor/libarchive/include/
 cp "$SOURCE/COPYING" Vendor/libarchive/
 cp "$BUILD/xz-$XZ_VERSION/COPYING" Vendor/libarchive/XZ-COPYING

@@ -1,7 +1,7 @@
 import Foundation
 
 public enum ArchiveError: Error, LocalizedError, Equatable {
-    case invalid(String), unsafePath(String), unsupported(String), missingEngine(String)
+    case invalid(String), unsafePath(String), metadataOnly(String), unsupported(String), missingEngine(String)
     case passwordRequired, wrongPassword, cancelled, timedOut
     case missingVolume(String), collision(String), resourceLimit(String)
     case engine(Int32, String), io(String)
@@ -11,6 +11,7 @@ public enum ArchiveError: Error, LocalizedError, Equatable {
         case .invalid(let s), .unsafePath(let s), .unsupported(let s), .missingEngine(let s),
              .missingVolume(let s), .collision(let s), .resourceLimit(let s), .io(let s), .licenseRequired(let s): return s
         case .passwordRequired: return "A password is required."
+        case .metadataOnly(let path): return "This selection contains a link or special file. Select regular files to preview or extract. "+path
         case .wrongPassword: return "The password is incorrect, or the encrypted data is damaged."
         case .cancelled: return "The operation was cancelled."
         case .timedOut: return "The operation exceeded its time limit."
@@ -21,6 +22,7 @@ public enum ArchiveError: Error, LocalizedError, Equatable {
         switch self {
         case .invalid: return "error.invalid"
         case .unsafePath: return "error.unsafe"
+        case .metadataOnly: return "error.metadataOnly"
         case .unsupported: return "error.unsupported"
         case .missingEngine: return "error.engine"
         case .passwordRequired: return "error.passwordRequired"
@@ -112,6 +114,7 @@ public struct ArchiveEntry: Codable, Sendable, Identifiable, Equatable {
     public var isEncrypted: Bool
     public var isUnsafeType: Bool
     public var linkTarget: String?
+    public var isMetadataOnly: Bool { isUnsafeType || linkTarget != nil }
     public var id: String { path }
     public init(path:String,size:UInt64=0,packedSize:UInt64?=nil,modified:Date?=nil,
                 isDirectory:Bool=false,isEncrypted:Bool=false,isUnsafeType:Bool=false,linkTarget:String?=nil) {
@@ -126,6 +129,24 @@ public struct ArchiveManifest: Codable, Sendable {
     public var format: String
     public var totalBytes: UInt64 { entries.reduce(0) { n,e in n.addingReportingOverflow(e.size).overflow ? UInt64.max : n+e.size } }
     public var encrypted: Bool { entries.contains { $0.isEncrypted } }
+    public func selectedEntries(_ selection:Set<String>?) throws -> [ArchiveEntry] {
+        guard let selection else { return entries }
+        guard !selection.isEmpty else { throw ArchiveError.invalid("No entries selected.") }
+        let paths=Set(try selection.map(PathSafety.canonicalEntry))
+        var missing=paths
+        if !entries.isEmpty { missing.remove(".") }
+        for entry in entries {
+            if missing.isEmpty { break }
+            var candidate=entry.path[...]
+            while true {
+                missing.remove(String(candidate))
+                guard let slash=candidate.lastIndex(of:"/") else { break }
+                candidate=candidate[..<slash]
+            }
+        }
+        guard missing.isEmpty else { throw ArchiveError.invalid("Selection does not exist in this archive.") }
+        return entries.filter{PathSafety.isSelected($0.path,by:paths)}
+    }
     public init(source:URL,backend:ArchiveBackend,entries:[ArchiveEntry],format:String) {
         self.source=source; self.backend=backend; self.entries=entries; self.format=format
     }

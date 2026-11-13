@@ -55,7 +55,7 @@ public enum NativeArchive {
                         let ctx=Unmanaged<Context>.fromOpaque(raw).takeUnretainedValue()
                         guard let selection=ctx.selected else { return 1 }
                         guard let name=value.pointee.path,let path=try? PathSafety.canonicalEntry(String(cString:name)) else { return 0 }
-                        return selection.contains(where:{path==$0 || path.hasPrefix($0+"/")}) ? 1 : 0
+                        return PathSafety.isSelected(path,by:selection) ? 1 : 0
                     },
                     { bytes,count,raw in
                         guard let raw else { return 1 }

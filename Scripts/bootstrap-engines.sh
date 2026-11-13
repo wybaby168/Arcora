@@ -59,7 +59,10 @@ PY
 done
 [ -n "$(find Vendor/7zip/Licenses -type f -print -quit)" ] || { echo 'License extraction failed.' >&2; exit 1; }
 # A macOS build must contain both native architectures, not rely on Rosetta.
-if [ "$PLATFORM" = mac ]; then xcrun lipo Vendor/7zip/7zz -verify_arch arm64 x86_64; fi
+if [ "$PLATFORM" = mac ]; then
+  xcrun lipo Vendor/7zip/7zz -verify_arch arm64
+  xcrun lipo Vendor/7zip/7zz -verify_arch x86_64
+fi
 printf '%s\n' "$PLATFORM" > Vendor/7zip/platform.txt
 Vendor/7zip/7zz i > "$TMP/engine-info.txt"
 grep -q "26.03" "$TMP/engine-info.txt" || { echo "Unexpected engine version" >&2; exit 1; }

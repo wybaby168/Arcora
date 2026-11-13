@@ -88,6 +88,11 @@
 "error.passwordRequired" = "A password is required.";
 "error.timeout" = "The operation timed out.";
 "error.unsafe" = "This archive contains an unsafe or ambiguous entry.";
+"error.metadataOnly" = "The selection contains a link or special file.";
+"action.entryInfo" = "View Entry Information";
+"browser.infoOnly" = "Information only";
+"browser.linkTarget" = "Stored link target";
+"browser.metadataOnly" = "Links and special files are available as information only. Select regular files to preview or extract.";
 "error.unsupported" = "This format or feature is not supported.";
 "error.volume" = "An archive part is missing.";
 "error.wrongPassword" = "The password is incorrect, or encrypted data is damaged.";
@@ -121,7 +126,7 @@
 "guide.password.title" = "Protect the archive";
 "guide.rar.body" = "Browse, test and extract RAR/RAR5 directly. To create RAR, open the download for your Mac architecture in Settings → Engines, import the original downloaded .tar.gz, then import your purchased rarreg.key. No manual installation or terminal setup is needed. After registration is confirmed, RAR5, solid compression, encryption and volumes are supported. Repair, REV and SFX creation are not provided.";
 "guide.rar.title" = "RAR compatibility";
-"guide.safety.body" = "Arcora processes files in a private temporary workspace, checks the result and commits to a new destination. Unsafe paths, links, devices and conflicting entry names are rejected. This conservative mode does not preserve every Unix metadata feature. Do not treat archive parsing as a security sandbox.";
+"guide.safety.body" = "Arcora lists links and special files as information. Regular files can be previewed or extracted individually. Extraction checks the selected files, rejects links and special files, and commits checked output from a private workspace to a new destination. Unsafe paths and conflicting names are checked when opening the archive. Full Unix metadata restoration and sandbox isolation require additional tools.";
 "guide.safety.title" = "New folders. No silent overwrites.";
 "guide.start.body" = "Drop an archive to browse it, or drop files and folders to create a new archive. Use ⌘O to open and ⌘N to create. Double-click folders to explore and files for Quick Look.";
 "guide.start.title" = "Start with a file";

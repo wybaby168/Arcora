@@ -114,7 +114,7 @@ Supply passwords through `--password-stdin`, not command-line arguments. Package
 
 ## Security and project structure
 
-Arcora rejects unsafe paths, links and special files, applies resource limits and audits extracted output. External codecs are native child processes, **not a strong App Sandbox boundary**. Archive bugs, hostile files and resource exhaustion remain risks. This is not a full-fidelity Unix backup tool: ACLs, ownership, resource forks and all extended attributes are not guaranteed to round-trip.
+Arcora can browse project archives containing symbolic links, including Python virtual environments. Links and special files display entry information, while regular files support individual previews and extraction. Extraction checks the selected scope, rejects links and special files within it, applies resource limits and audits the output. Unsafe paths and conflicting names are checked when opening an archive. External codecs are native child processes, **not a strong App Sandbox boundary**. Archive bugs, hostile files and resource exhaustion remain risks. This is not a full-fidelity Unix backup tool: ACLs, ownership, resource forks and all extended attributes are not guaranteed to round-trip.
 
 | Location | Responsibility |
 | --- | --- |
